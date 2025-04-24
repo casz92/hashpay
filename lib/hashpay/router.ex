@@ -49,15 +49,23 @@ defmodule Hashpay.Router do
     |> WebSockAdapter.upgrade(
       Hashpay.WebSocketHandler,
       [user_id: user_id, channel: channel],
-      timeout: 60_000
+      timeout: 120_000
     )
     |> halt()
   end
 
-  # Ruta para la página de ejemplo de WebSocket
-  get "/websocket-example" do
-    Hashpay.RouterWebSocketExample.handle_websocket_example(conn)
+  if Mix.env() == :dev do
+    # Ruta para el depurador de Plug
+    # use Plug.Debugger
+
+    get "/websocket-example" do
+      conn
+      |> put_resp_content_type("text/html")
+      |> send_file(200, "priv/html/websocket_example.html")
+    end
   end
+
+  # Ruta para la página de ejemplo de WebSocket
 
   # Captura todas las demás rutas
   match _ do
