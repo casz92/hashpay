@@ -8,3 +8,46 @@ erl_crash.dump
 *.beam
 /config/*.secret.exs
 .elixir_ls/
+
+composer.phar
+/vendor/
+
+.eunit
+*.o
+*.plt
+erl_crash.dump
+.concrete/DEV_MODE
+
+# rebar 2.x
+.rebar
+rel/example_project
+ebin/*.beam
+deps
+
+# rebar 3
+.rebar3
+_build/
+_checkouts/
+
+# compress archives, libraries and executables
+*.zip
+*.rar
+*.7z
+*.lzma
+*.gz
+*.bz2
+*.jar
+*.egg
+*.whl
+*.egg-info
+*.dist-info
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+*.obj
+*.exe
