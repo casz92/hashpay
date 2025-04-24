@@ -4,12 +4,24 @@ defmodule Hashpay.MixProject do
   def project do
     [
       app: :hashpay,
+      name: "Hashpay",
+      description: "Cryptocurrency payment system",
+      source_url: "https://github.com/casz92/hashpay",
+      package: package(),
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       # Agregar configuración de releases
       releases: releases()
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["Carlos Suarez"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/casz92/hashpay"}
     ]
   end
 
@@ -28,7 +40,18 @@ defmodule Hashpay.MixProject do
   def application do
     [
       mod: {Hashpay.Application, []},
-      extra_applications: [:logger, :crypto, :xandra, :broadway, :poolboy, :runtime_tools, :bandit, :plug, :websock, :websock_adapter]
+      extra_applications: [
+        :logger,
+        :crypto,
+        :xandra,
+        :broadway,
+        :poolboy,
+        :runtime_tools,
+        :bandit,
+        :plug,
+        :websock,
+        :websock_adapter
+      ]
     ]
   end
 
@@ -40,6 +63,8 @@ defmodule Hashpay.MixProject do
 
       # CBOR - Concise Binary Object Representation
       {:cbor, "~> 1.0.1"},
+
+      # Jason - Parser y generador de JSON
       {:jason, "~> 1.4"},
 
       # ScyllaDB/Cassandra driver
@@ -73,10 +98,6 @@ defmodule Hashpay.MixProject do
 
       # Phoenix PubSub - Sistema de publicación/suscripción
       {:phoenix_pubsub, "~> 2.1"}
-
-      # Otras dependencias pueden agregarse aquí
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
   end
 end
