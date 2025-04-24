@@ -1,0 +1,82 @@
+defmodule Hashpay.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :hashpay,
+      version: "0.1.0",
+      elixir: "~> 1.17",
+      start_permanent: Mix.env() == :prod,
+      deps: deps(),
+      # Agregar configuración de releases
+      releases: releases()
+    ]
+  end
+
+  # Configuración para releases
+  defp releases do
+    [
+      hashpay: [
+        include_executables_for: [:unix, :windows],
+        applications: [runtime_tools: :permanent],
+        steps: [:assemble, :tar]
+      ]
+    ]
+  end
+
+  # Run "mix help compile.app" to learn about applications.
+  def application do
+    [
+      mod: {Hashpay.Application, []},
+      extra_applications: [:logger, :crypto, :xandra, :broadway, :poolboy, :runtime_tools, :bandit, :plug, :websock, :websock_adapter]
+    ]
+  end
+
+  # Run "mix help deps" to learn about dependencies.
+  defp deps do
+    [
+      # Cafezinho - Biblioteca para criptografía
+      {:cafezinho, "~> 0.4.2"},
+
+      # CBOR - Concise Binary Object Representation
+      {:cbor, "~> 1.0.1"},
+      {:jason, "~> 1.4"},
+
+      # ScyllaDB/Cassandra driver
+      # Driver para ScyllaDB/Cassandra
+      {:xandra, "~> 0.19.2"},
+      # Requerido por Xandra
+      {:decimal, "~> 2.1"},
+
+      # Broadway - Procesamiento de datos concurrente
+      {:broadway, "~> 1.2.1"},
+
+      # Poolboy - Gestión de pool de procesos
+      {:poolboy, "~> 1.5.2"},
+
+      # Bandit - Servidor HTTP/HTTPS
+      {:bandit, "~> 1.6"},
+
+      # Plug - Framework para aplicaciones web
+      {:plug, "~> 1.15"},
+      {:plug_cowboy, "~> 2.6"},
+
+      # X509 - Para generar certificados SSL
+      {:x509, "~> 0.8"},
+
+      # WebSock - Abstracción para WebSockets
+      {:websock, "~> 0.5"},
+      {:websock_adapter, "~> 0.5.3"},
+
+      # UUID - Generación de identificadores únicos
+      {:uuid, "~> 1.1"},
+
+      # Phoenix PubSub - Sistema de publicación/suscripción
+      {:phoenix_pubsub, "~> 2.1"}
+
+      # Otras dependencias pueden agregarse aquí
+      # {:dep_from_hexpm, "~> 0.3.0"},
+      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
+    ]
+  end
+end
