@@ -25,12 +25,12 @@ defmodule Hashpay.Router do
   end
 
   # Ruta de estado para verificar que el servidor está funcionando
-  @vsn Application.spec(:hashpay, :vsn) |> to_string()
   get "/status" do
     response = %{
       status: "ok",
+      # s3: Application.get_env(:hashpay, :s3_endpoint),
       timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
-      version: @vsn
+      version: Application.spec(:hashpay, :vsn) |> to_string()
     }
 
     conn

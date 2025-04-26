@@ -12,12 +12,20 @@ config :logger, level: :info
 
 # Configuración para ScyllaDB/Cassandra usando Xandra
 config :hashpay, :scylla,
-  nodes: ["scylla-node1:9042", "scylla-node2:9042", "scylla-node3:9042"],
+  nodes: ["localhost:9042"],
   keyspace: "hashpay_prod",
-  pool_size: 20,
-  authentication: nil,  # Se debe configurar en runtime.exs
-  retry_count: 5,
-  retry_delay: 2000
+  # authentication: {"username", "password"},
+  connect_timeout: 5000,
+  name: :xandra_pool,
+  default_consistency: :one,
+  encryption: false,
+  max_concurrent_requests_per_connection: 100,
+  protocol_version: :v4,
+  show_sensitive_data_on_connection_error: true,
+  transport_options: [
+    # Tamaño del buffer en bytes
+    buffer: 1_000_000
+  ]
 
 # Configuración para el pool de procesos
 config :hashpay, :poolboy,
@@ -26,7 +34,8 @@ config :hashpay, :poolboy,
 
 # Configuración para Broadway
 config :hashpay, :broadway,
-  producer_module: nil,  # Módulo productor a definir
+  # Módulo productor a definir
+  producer_module: nil,
   processors: [
     default: [concurrency: 10]
   ],

@@ -11,32 +11,32 @@ defmodule Hashpay.Application do
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
 
+    db_opts = Application.get_env(:hashpay, :scylla)
+
+    # Inicializar la conexión a ScyllaDB
+    # init_scylla_connection()
+
     # Configuración para HTTP
     children = [
       # PubSub para comunicación entre procesos
       Hashpay.PubSub,
-
+      # Conexión a ScyllaDB
+      {Hashpay.DB, db_opts},
       # Servidor HTTP
-      {Bandit,
-        plug: Hashpay.Router,
-        port: http_port,
-        startup_log: :info
-      },
+      {Bandit, plug: Hashpay.Router, port: http_port, startup_log: :info},
 
       # Servidor HTTPS
       {Bandit,
-        plug: Hashpay.Router,
-        scheme: :https,
-        port: https_port,
-        keyfile: cert_path("key.pem"),
-        certfile: cert_path("cert.pem"),
-        cipher_suite: :strong,
-        startup_log: :info,
-        otp_app: :hashpay
-      }
+       plug: Hashpay.Router,
+       scheme: :https,
+       port: https_port,
+       keyfile: cert_path("key.pem"),
+       certfile: cert_path("cert.pem"),
+       cipher_suite: :strong,
+       startup_log: :info,
+       otp_app: :hashpay}
 
       # Otros servicios pueden agregarse aquí
-      # {Hashpay.ScyllaRepo, []},
       # {Hashpay.Broadway, []},
       # {Hashpay.WorkerSupervisor, []}
     ]

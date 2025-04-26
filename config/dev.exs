@@ -9,13 +9,20 @@ config :hashpay,
 
 # Configuración para ScyllaDB/Cassandra usando Xandra
 config :hashpay, :scylla,
-  nodes: ["127.0.0.1:9042"],
+  nodes: ["localhost:9042"],
   keyspace: "hashpay_dev",
-  pool_size: 10,
-  authentication: nil,
-  # authentication: {username, password}
-  retry_count: 3,
-  retry_delay: 1000
+  # authentication: {"username", "password"},
+  connect_timeout: 5000,
+  name: :xandra_pool,
+  default_consistency: :one,
+  encryption: false,
+  max_concurrent_requests_per_connection: 100,
+  protocol_version: :v4,
+  show_sensitive_data_on_connection_error: true,
+  transport_options: [
+    # Tamaño del buffer en bytes
+    buffer: 1_000_000
+  ]
 
 # Configuración para el logger en desarrollo
 config :logger, :console,
@@ -29,7 +36,8 @@ config :hashpay, :poolboy,
 
 # Configuración para Broadway
 config :hashpay, :broadway,
-  producer_module: nil,  # Módulo productor a definir
+  # Módulo productor a definir
+  producer_module: nil,
   processors: [
     default: [concurrency: 2]
   ],
