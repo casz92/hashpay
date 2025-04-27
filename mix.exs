@@ -96,6 +96,9 @@ defmodule Hashpay.MixProject do
       # UUID - Generación de identificadores únicos
       {:uuid, "~> 1.1"},
 
+      # totp - Time-based One-Time Password
+      {:nimble_totp, "~> 1.0"},
+
       # Phoenix PubSub - Sistema de publicación/suscripción
       {:phoenix_pubsub, "~> 2.1"}
     ]

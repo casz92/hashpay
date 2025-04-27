@@ -1,16 +1,29 @@
 defmodule Hashpay.DB do
   use GenServer
+  require Logger
 
   @connection_key :scylla_connection
+  @module_name Module.split(__MODULE__) |> Enum.join(".")
 
   @doc """
   Inicia el proceso supervisado para manejar conexiones a ScyllaDB.
   """
   def start_link(opts) do
-    IO.puts("Starting DB2")
-    {:ok, pid} = Xandra.start_link(opts)
-    :persistent_term.put(@connection_key, pid)
-    {:ok, pid}
+    version = Application.spec(:xandra, :vsn)
+
+    case Xandra.start_link(opts) do
+      {:ok, pid} ->
+        Logger.info("Running #{@module_name} with Xandra v#{version} ✅")
+        :persistent_term.put(@connection_key, pid)
+        {:ok, pid}
+
+      {:error, reason} ->
+        Logger.error(
+          "Failed to start #{@module_name} with Xandra v#{version} ❌: #{inspect(reason)}"
+        )
+
+        {:error, reason}
+    end
   end
 
   @impl true

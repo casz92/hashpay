@@ -8,10 +8,11 @@ defmodule Hashpay.Application do
   @impl true
   def start(_type, _args) do
     # Obtener configuración del entorno
+    version = vsn()
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
 
-    db_opts = Application.get_env(:hashpay, :scylla)
+    db_opts = get_env(:scylla, nil)
 
     # Inicializar la conexión a ScyllaDB
     # init_scylla_connection()
@@ -19,7 +20,9 @@ defmodule Hashpay.Application do
     # Configuración para HTTP
     children = [
       # PubSub para comunicación entre procesos
+      Hashpay.Hits,
       Hashpay.PubSub,
+      {Hashpay.Broker, name: :cluster},
       # Conexión a ScyllaDB
       {Hashpay.DB, db_opts},
       # Servidor HTTP
@@ -35,19 +38,24 @@ defmodule Hashpay.Application do
        cipher_suite: :strong,
        startup_log: :info,
        otp_app: :hashpay}
-
-      # Otros servicios pueden agregarse aquí
-      # {Hashpay.Broadway, []},
-      # {Hashpay.WorkerSupervisor, []}
     ]
 
     # Mostrar información de inicio
-    Logger.info("Iniciando Hashpay...")
+    Logger.info("Starting Hashpay v#{version} ⌛")
 
     # Ver https://hexdocs.pm/elixir/Supervisor.html
     # para otras estrategias y opciones
     opts = [strategy: :one_for_one, name: Hashpay.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, pid} ->
+        Logger.info("Hashpay v#{version} started ✨")
+        {:ok, pid}
+
+      {:error, reason} ->
+        Logger.error("Failed to start Hashpay 💥: #{inspect(reason)}")
+        {:error, reason}
+    end
   end
 
   # Función auxiliar para obtener configuración del entorno
@@ -61,5 +69,9 @@ defmodule Hashpay.Application do
   # Función auxiliar para obtener la ruta de los certificados
   defp cert_path(file) do
     Path.join(Application.app_dir(:hashpay, "priv/certs"), file)
+  end
+
+  defp vsn do
+    Application.spec(:hashpay, :vsn) |> to_string()
   end
 end

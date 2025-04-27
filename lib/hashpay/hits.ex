@@ -1,134 +1,115 @@
 defmodule Hashpay.Hits do
+  @behaviour GenServer
   @moduledoc """
   Módulo para almacenar y gestionar hits (accesos) a objetos en una tabla ETS.
 
   Almacena información sobre objetos accedidos recientemente:
   - id: Identificador único del objeto
-  - updated_at: Timestamp de la última actualización
-  - hits: Contador de accesos al objeto
+  - type: Tipo de objeto (Hashpay.object_type())
+  - readed_at: Timestamp de la última lectura
+  - written_at: Timestamp de la última escritura
   """
-
+  require Logger
+  @module_name Module.split(__MODULE__) |> Enum.join(".")
   @table_name :hits
+  @unit_time :millisecond
+  @cleanup_interval :timer.minutes(10)
+  @expiration_time :timer.hours(1)
+
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: :permanent,
+      shutdown: 500
+    }
+  end
 
   @doc """
   Inicia el módulo de hits creando la tabla ETS.
   """
-  def start_link do
+  def start_link(_opts) do
     # Crear tabla ETS con nombre del módulo, pública y con concurrencia de lectura
-    @table_name = :ets.new(@table_name, [:named_table, :public, :set, {:read_concurrency, true}])
-    {:ok, self()}
+    :ets.new(@table_name, [:named_table, :public, :set, {:read_concurrency, true}])
+
+    case GenServer.start_link(__MODULE__, [], name: __MODULE__) do
+      {:ok, pid} ->
+        Logger.info("Running #{@module_name} ✅")
+        {:ok, pid}
+
+      {:error, reason} ->
+        Logger.error("Failed to start #{@module_name} ❌: #{inspect(reason)}")
+        {:error, reason}
+    end
   end
 
-  @doc """
-  Registra un hit para el ID especificado.
-  Si el ID no existe, lo crea con un contador inicial de 1.
-  Si existe, incrementa el contador y actualiza el timestamp.
+  @impl true
+  def init(args) do
+    Process.send_after(self(), :cleanup, @cleanup_interval)
+    {:ok, args}
+  end
 
-  ## Parámetros
-
-  - `id`: Identificador único del objeto
-
-  ## Retorno
-
-  - `{:ok, hits}`: Número actual de hits después de la operación
-  """
-  def register(id) do
-    timestamp = :os.timestamp()
+  @spec hit_read(binary(), Hashpay.object_type()) :: boolean()
+  def hit_read(id, type) do
+    timestamp = now()
 
     case :ets.lookup(@table_name, id) do
       [] ->
-        # Nuevo registro: {id, updated_at, hits}
-        :ets.insert(@table_name, {id, timestamp, 1})
-        {:ok, 1}
+        # Nuevo registro: {id, readed_at, written_at}
+        :ets.insert(@table_name, {id, type, timestamp, nil})
 
-      [{^id, _old_timestamp, hits}] ->
+      [{^id, _old_read_at, _old_write_at}] ->
         # Actualizar registro existente
-        new_hits = hits + 1
-        :ets.insert(@table_name, {id, timestamp, new_hits})
-        {:ok, new_hits}
+        :ets.update_element(@table_name, id, {2, timestamp})
     end
   end
 
-  @doc """
-  Obtiene la información de hits para un ID específico.
+  @spec hit_write(binary(), Hashpay.object_type()) :: boolean()
+  def hit_write(id, type) do
+    timestamp = now()
 
-  ## Parámetros
-
-  - `id`: Identificador único del objeto
-
-  ## Retorno
-
-  - `{:ok, {updated_at, hits}}`: Timestamp y número de hits
-  - `{:error, :not_found}`: Si el ID no existe
-  """
-  def get(id) do
     case :ets.lookup(@table_name, id) do
-      [{^id, timestamp, hits}] -> {:ok, {timestamp, hits}}
-      [] -> {:error, :not_found}
+      [] ->
+        :ets.insert(@table_name, {id, type, nil, timestamp})
+
+      [{^id, _old_read_at, _old_write_at}] ->
+        # Actualizar registro existente
+        :ets.update_element(@table_name, id, {3, timestamp})
     end
   end
 
-  @doc """
-  Obtiene los N objetos más accedidos (con mayor número de hits).
+  @spec retrive_by_type(Hashpay.object_type()) :: [binary() | String.t()]
+  def retrive_by_type(type) do
+    match_spec =
+      :ets.fun2ms(fn {id, ^type, _readed_at, _written_at} ->
+        id
+      end)
 
-  ## Parámetros
-
-  - `limit`: Número máximo de objetos a retornar (por defecto 10)
-
-  ## Retorno
-
-  - Lista de tuplas `{id, updated_at, hits}` ordenadas por hits (descendente)
-  """
-  def top(limit \\ 10) do
-    :ets.tab2list(@table_name)
-    |> Enum.sort_by(fn {_id, _timestamp, hits} -> hits end, :desc)
-    |> Enum.take(limit)
+    :ets.select(@table_name, match_spec)
   end
 
-  @doc """
-  Obtiene los objetos actualizados más recientemente.
-
-  ## Parámetros
-
-  - `limit`: Número máximo de objetos a retornar (por defecto 10)
-
-  ## Retorno
-
-  - Lista de tuplas `{id, updated_at, hits}` ordenadas por timestamp (descendente)
-  """
-  def recent(limit \\ 10) do
-    :ets.tab2list(@table_name)
-    |> Enum.sort_by(fn {_id, timestamp, _hits} -> timestamp end, :desc)
-    |> Enum.take(limit)
-  end
-
-  @doc """
-  Elimina un registro de la tabla.
-
-  ## Parámetros
-
-  - `id`: Identificador único del objeto a eliminar
-  """
-  def delete(id) do
+  def remove(id) do
     :ets.delete(@table_name, id)
-    :ok
   end
 
-  @doc """
-  Limpia registros antiguos basados en un timestamp límite.
-
-  ## Parámetros
-
-  - `older_than`: Timestamp límite (registros más antiguos serán eliminados)
-
-  ## Retorno
-
-  - Número de registros eliminados
-  """
   def cleanup(older_than) do
-    size = :ets.info(@table_name, :size)
-    :ets.select_delete(@table_name, [{{:"$1", :"$2", :"$3"}, [{:<, :"$2", older_than}], [true]}])
+    match_spec =
+      :ets.fun2ms(fn {_id, readed_at, _written_at} ->
+        readed_at != nil or readed_at < older_than
+      end)
 
-    size
+    :ets.select_delete(@table_name, match_spec)
+  end
+
+  defp now do
+    :os.system_time(@unit_time)
+  end
+
+  @impl true
+  def handle_info(:cleanup, state) do
+    cleanup(now() - @expiration_time)
+    Process.send_after(self(), :cleanup, @cleanup_interval)
+    {:ok, state}
   end
 end

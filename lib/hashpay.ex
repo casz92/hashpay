@@ -4,6 +4,21 @@ defmodule Hashpay do
   """
   alias Hashpay.Variable
 
+  @type object_type ::
+          :account
+          | :block
+          | :round
+          | :tx
+          | :merchant
+          | :currency
+          | :validator
+          | :member
+          | :balance
+          | :holding
+          | :plan
+          | :payday
+          | :lottery
+
   def gen_id do
     time =
       :os.system_time(:second)
@@ -50,6 +65,14 @@ defmodule Hashpay do
       |> Base62.encode()
 
     IO.iodata_to_binary(["ac_", tail])
+  end
+
+  def get_last_round_id do
+    :persistent_term.get({:var, "last_round"}, 0)
+  end
+
+  def put_last_round_id(round_id) do
+    :persistent_term.put({:var, "last_round"}, round_id)
   end
 
   @doc """

@@ -55,6 +55,39 @@ defmodule Hashpay.Router do
     |> halt()
   end
 
+  if Application.compile_env(:hashpay, :enable_broker, true) do
+    get "/broker" do
+      conn = fetch_query_params(conn)
+      username = Map.get(conn.params, "username")
+      password = Map.get(conn.params, "password") |> Base.decode16!()
+
+      with false <- is_nil(username),
+           true <- validate_credentials(password) do
+        Logger.info("WebSocket connection request from user: #{username}")
+
+        conn
+        |> WebSockAdapter.upgrade(
+          Hashpay.MessageBrokerHandler,
+          [user_id: username],
+          timeout: 150_000
+        )
+        |> halt()
+      else
+        _error ->
+          conn
+          |> send_resp(401, "Unauthorized")
+          |> halt()
+      end
+    end
+
+    defp validate_credentials(nil), do: false
+
+    defp validate_credentials(password) do
+      secret = Application.get_env(:hashpay, :broker_secret)
+      NimbleTOTP.valid?(secret, password, period: 60)
+    end
+  end
+
   if Mix.env() == :dev do
     # Ruta para el depurador de Plug
     # use Plug.Debugger

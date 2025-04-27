@@ -23,7 +23,7 @@ defmodule Hashpay.Block do
   use Hashpay.Serializable
   @behaviour Hashpay.MigrationBehaviour
 
-  alias Hashpay.DB
+  alias Hashpay.{DB, Channel}
 
   @enforce_keys [
     :creator,
@@ -122,7 +122,7 @@ defmodule Hashpay.Block do
     # Extraer los campos relevantes para el hash
     fields = [
       block.creator,
-      block.channel,
+      block.channel || Channel.current(),
       Integer.to_string(block.height),
       block.prev,
       Integer.to_string(block.timestamp),

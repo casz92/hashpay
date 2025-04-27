@@ -23,7 +23,8 @@ config :hashpay,
        :hashnumber,
        14_094_546_945_335_813_518_113_527_622_292_004_298_502_402_621_906_749_383_847_767_774_109_225_594_204
 
-config :hashpay, :channel, "origin"
+config :hashpay, :default_channel, "origin"
+config :hashpay, :channel, "first"
 config :hashpay, :pubkey, pubkey
 # config :hashpay, :address, Hashpay.gen_address_from_pubkey(pubkey)
 
