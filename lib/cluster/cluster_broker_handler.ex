@@ -1,10 +1,10 @@
-defmodule Hashpay.MessageBrokerHandler do
+defmodule Hashpay.ClusterBrokerHandler do
   @moduledoc """
-  Manejador de mensajes para el broker de mensajes.
+  Manejador de mensajes para el broker de mensajes del cluster.
   """
   require Logger
   alias Hashpay.PubSub
-  alias Hashpay.Broker
+  alias Hashpay.Cluster
   @behaviour WebSock
 
   # Canal por defecto
@@ -13,25 +13,25 @@ defmodule Hashpay.MessageBrokerHandler do
   @impl WebSock
   def init(args) do
     # Obtener parámetros de la conexión
-    user_id = Keyword.get(args, :user_id)
+    node = Keyword.get(args, :node)
 
     # Crear el estado inicial
     state = %{
-      user_id: user_id
+      id: node.name
     }
 
     # Unirse al broker
-    Broker.join(user_id)
+    Cluster.join(node)
 
     # Suscribirse al canal
     PubSub.subscribe(@default_channel)
 
-    Logger.info("WebSocket connection initialized for user: #{user_id}")
+    Logger.info("WebSocket connection initialized for node: #{state.id}")
     {:ok, state}
   end
 
   @impl WebSock
-  def handle_in({text, _opts}, %{user_id: user_id} = state) do
+  def handle_in({text, _opts}, %{id: node_id} = state) do
     # Intentar decodificar el mensaje como JSON
     case Jason.decode(text) do
       {:ok, %{"method" => "subscribe", "channel" => channel}} ->
@@ -46,18 +46,18 @@ defmodule Hashpay.MessageBrokerHandler do
 
       {:ok, %{"method" => "publish", "channel" => channel, "message" => message}} ->
         # Publicar el mensaje en el canal
-        new_message = Map.put(message, "from_node", user_id)
+        new_message = Map.put(message, "from_node", node_id)
         PubSub.broadcast_from(channel, {:channel_message, new_message})
         {:ok, state}
 
       {:ok, %{"method" => "members"}} ->
         # Enviar la lista de miembros
-        members = Broker.members()
+        members = Cluster.members()
         response = Jason.encode!(%{type: "members", members: members})
         {:push, {:text, response}, state}
 
       _ ->
-        Logger.info("Received message from #{state.user_id}: #{text}")
+        Logger.info("Received message from #{node_id}: #{text}")
         {:ok, state}
     end
   end
@@ -71,13 +71,13 @@ defmodule Hashpay.MessageBrokerHandler do
   end
 
   @impl WebSock
-  def terminate(reason, %{user_id: user_id} = state) do
+  def terminate(reason, %{id: node_id}) do
     Logger.info(
-      "WebSocket connection terminated for user: #{state.user_id}, reason: #{inspect(reason)}"
+      "WebSocket connection terminated for node: #{node_id}, reason: #{inspect(reason)}"
     )
 
     # Salir del broker
-    Broker.leave(user_id)
+    Cluster.leave(node_id)
 
     :ok
   end

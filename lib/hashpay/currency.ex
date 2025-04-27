@@ -123,8 +123,8 @@ defmodule Hashpay.Currency do
       symbol: attrs[:symbol],
       max_supply: attrs[:max_supply],
       props: attrs[:props],
-      creation: System.os_time(:second),
-      updated: System.os_time(:second)
+      creation: Hashpay.get_last_round_id(),
+      updated: Hashpay.get_last_round_id()
     }
   end
 

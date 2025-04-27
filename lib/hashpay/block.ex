@@ -23,7 +23,7 @@ defmodule Hashpay.Block do
   use Hashpay.Serializable
   @behaviour Hashpay.MigrationBehaviour
 
-  alias Hashpay.{DB, Channel}
+  alias Hashpay.{DB}
 
   @enforce_keys [
     :creator,
@@ -89,7 +89,7 @@ defmodule Hashpay.Block do
       ...>   channel: "main",
       ...>   height: 1,
       ...>   prev: nil,
-      ...>   timestamp: System.os_time(:second),
+      ...>   timestamp: System.os_time(:millisecond),
       ...>   count: 10,
       ...>   rejected: 0,
       ...>   size: 1024,
@@ -100,7 +100,7 @@ defmodule Hashpay.Block do
   """
   def new(attrs, private_key) when is_map(attrs) do
     # Asegurarse de que timestamp esté presente
-    attrs = Map.put_new_lazy(attrs, :timestamp, fn -> System.os_time(:second) end)
+    attrs = Map.put_new_lazy(attrs, :timestamp, fn -> System.os_time(:millisecond) end)
 
     # Crear un bloque sin hash ni firma
     block_without_hash = struct!(__MODULE__, attrs)
@@ -121,20 +121,18 @@ defmodule Hashpay.Block do
   def calculate_hash(block) do
     # Extraer los campos relevantes para el hash
     fields = [
-      block.creator,
-      block.channel || Channel.current(),
-      Integer.to_string(block.height),
       block.prev,
-      Integer.to_string(block.timestamp),
+      block.creator,
+      block.channel,
+      Base.decode16!(block.filehash),
       Integer.to_string(block.count),
-      Integer.to_string(block.rejected),
-      Integer.to_string(block.size),
-      Integer.to_string(block.status),
       Integer.to_string(block.vsn)
     ]
 
     # Unir los campos y calcular el hash
-    :crypto.hash(:sha256, Enum.join(fields, "|"))
+    <<hash::192, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields, "|"))
+
+    [<<block.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end
 
   @doc """

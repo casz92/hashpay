@@ -113,6 +113,8 @@ defmodule Hashpay.Validator do
   end
 
   def new(attrs) do
+    last_round_id = Hashpay.get_last_round_id()
+
     %__MODULE__{
       id: generate_id(),
       hostname: attrs[:hostname],
@@ -126,8 +128,8 @@ defmodule Hashpay.Validator do
       factor_b: attrs[:factor_b],
       active: attrs[:active],
       failures: attrs[:failures],
-      creation: System.os_time(:second),
-      updated: System.os_time(:second)
+      creation: last_round_id,
+      updated: last_round_id
     }
   end
 

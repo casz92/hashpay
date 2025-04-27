@@ -21,7 +21,7 @@ defmodule Hashpay do
 
   def gen_id do
     time =
-      :os.system_time(:second)
+      :os.system_time(:millisecond)
 
     [
       :binary.encode_unsigned(time),
@@ -33,7 +33,7 @@ defmodule Hashpay do
 
   def gen_id(prefix) do
     time =
-      :os.system_time(:second)
+      :os.system_time(:millisecond)
 
     tail =
       [
@@ -54,7 +54,7 @@ defmodule Hashpay do
 
   def gen_address_from_pubkey(pubkey) do
     time =
-      :os.system_time(:second)
+      :os.system_time(:millisecond)
 
     tail =
       [

@@ -63,7 +63,7 @@ defmodule Hashpay.Member do
     %__MODULE__{
       group_id: group_id,
       member_id: member_id,
-      creation: System.os_time(:second),
+      creation: Hashpay.get_last_round_id(),
       meta: meta
     }
   end

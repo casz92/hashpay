@@ -1,28 +1,41 @@
 defmodule Hashpay.Account do
+  alias Hashpay.Account
   alias Hashpay.Hits
   alias Hashpay.DB
   @behaviour Hashpay.MigrationBehaviour
 
   @type t :: %__MODULE__{
           id: String.t(),
+          name: String.t(),
           pubkey: binary,
           channel: String.t(),
-          sig_type: non_neg_integer()
+          verified: boolean(),
+          type_alg: non_neg_integer()
         }
 
   defstruct [
     :id,
+    :name,
     :pubkey,
     :channel,
-    :sig_type
+    :type_alg,
+    verified: false
   ]
+
+  @prefix "ac_"
+
+  def generate_id(pubkey) do
+    <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
+    IO.iodata_to_binary([@prefix, Base.encode16(first16bytes)])
+  end
 
   def new(attrs) do
     %__MODULE__{
-      id: attrs[:id],
+      id: generate_id(attrs[:pubkey]),
+      name: attrs[:name],
       pubkey: attrs[:pubkey],
       channel: attrs[:channel],
-      sig_type: attrs[:sig_type]
+      type_alg: attrs[:type_alg]
     }
   end
 
@@ -40,9 +53,11 @@ defmodule Hashpay.Account do
     statement = """
     CREATE TABLE IF NOT EXISTS accounts (
       id text,
+      name text UNIQUE,
       pubkey blob,
       channel text,
-      sig_type int,
+      verified boolean,
+      type_alg int,
       PRIMARY KEY (id)
     );
     """
@@ -60,19 +75,16 @@ defmodule Hashpay.Account do
   end
 
   def save(conn, %__MODULE__{} = account) do
-    statement = """
-    INSERT INTO accounts (id, pubkey, channel, sig_type)
-    VALUES (?, ?, ?, ?);
-    """
-
     params = [
       {"text", account.id},
+      {"text", account.name},
       {"blob", account.pubkey},
       {"text", account.channel},
-      {"int", account.sig_type}
+      {"boolean", account.verified},
+      {"int", account.type_alg}
     ]
 
-    case DB.execute(conn, statement, params) do
+    case DB.execute(conn, insert_prepared(), params) do
       {:ok, _} ->
         Hits.hit_write(account.id, :account)
         {:ok, account}
@@ -82,10 +94,25 @@ defmodule Hashpay.Account do
     end
   end
 
+  def batch_save(batch, account) do
+    Xandra.Batch.add(batch, insert_prepared(), [
+      {"text", account.id},
+      {"text", account.name},
+      {"blob", account.pubkey},
+      {"text", account.channel},
+      {"boolean", account.verified},
+      {"int", account.type_alg}
+    ])
+  end
+
+  def batch_delete(batch, id) do
+    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+  end
+
   def prepare_statements!(conn) do
     insert_prepared = """
-    INSERT INTO accounts (id, pubkey, channel, sig_type)
-    VALUES (?, ?, ?, ?);
+    INSERT INTO accounts (id, name, pubkey, channel, verified, type_alg)
+    VALUES (?, ?, ?, ?, ?, ?);
     """
 
     delete_statement = "DELETE FROM accounts WHERE id = ?;"
@@ -106,25 +133,15 @@ defmodule Hashpay.Account do
   end
 
   def batch_sync(batch) do
-    insert_prepared = insert_prepared()
-    delete_prepared = delete_prepared()
-
     # Optimizar con Stream para evitar acumulación en memoria
     fetch_all()
     |> Stream.map(fn
       {id, :delete} ->
         remove(id)
-        Xandra.Batch.add(batch, delete_prepared, [{"text", id}])
+        batch_delete(batch, id)
 
       {_id, account} ->
-        params = [
-          {"blob", account.pubkey},
-          {"text", account.channel},
-          {"int", account.sig_type},
-          {"text", account.id}
-        ]
-
-        Xandra.Batch.add(batch, insert_prepared, params)
+        batch_save(batch, account)
     end)
     # Ejecuta el proceso sin acumular memoria innecesariamente
     |> Stream.run()
@@ -145,6 +162,16 @@ defmodule Hashpay.Account do
     case fetch(id) do
       {:ok, account} -> {:ok, account}
       {:error, :not_found} -> get(conn, id)
+    end
+  end
+
+  def fetch_by_channel(conn, id, channel) do
+    case fetch(id) do
+      {:ok, account} ->
+        (account.channel == channel && {:ok, account}) || {:error, :not_found}
+
+      {:error, :not_found} ->
+        get(conn, id, channel)
     end
   end
 
@@ -169,17 +196,77 @@ defmodule Hashpay.Account do
     end
   end
 
+  def get(conn, id, channel) do
+    statement = "SELECT * FROM accounts WHERE id = ? AND channel = ?;"
+    params = [{"text", id}, {"text", channel}]
+
+    case DB.execute(conn, statement, params) do
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [row] -> {:ok, row_to_struct(row)}
+          [] -> {:error, :not_found}
+          _ -> {:error, :multiple_results}
+        end
+
+      error ->
+        error
+    end
+  end
+
+  def verified?(%Account{verified: verified}), do: verified
+
+  def verified?(conn, id) do
+    case fetch(conn, id) do
+      {:ok, account} -> account.verified
+      {:error, _} -> false
+    end
+  end
+
+  def get_and_exists(conn, id, name) do
+    statement = "SELECT * FROM accounts WHERE id = ? OR name = ?;"
+    params = [{"text", id}, {"text", name}]
+
+    case DB.execute(conn, statement, params) do
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [row] -> {:ok, row_to_struct(row)}
+          [] -> {:error, :not_found}
+          _ -> {:error, :multiple_results}
+        end
+
+      error ->
+        error
+    end
+  end
+
+  def get_by_name(conn, name) do
+    statement = "SELECT * FROM accounts WHERE name = ?;"
+    params = [{"text", name}]
+
+    case DB.execute(conn, statement, params) do
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [row] -> {:ok, row_to_struct(row)}
+          [] -> {:error, :not_found}
+          _ -> {:error, :multiple_results}
+        end
+
+      error ->
+        error
+    end
+  end
+
   def update(conn, %__MODULE__{} = account) do
     statement = """
     UPDATE accounts
-    SET pubkey = ?, channel = ?, sig_type = ?
+    SET pubkey = ?, channel = ?, type_alg = ?
     WHERE id = ?;
     """
 
     params = [
       {"blob", account.pubkey},
       {"text", account.channel},
-      {"int", account.sig_type},
+      {"int", account.type_alg},
       {"text", account.id}
     ]
 
@@ -207,7 +294,7 @@ defmodule Hashpay.Account do
       id: row["id"],
       pubkey: row["pubkey"],
       channel: row["channel"],
-      sig_type: row["sig_type"]
+      type_alg: row["type_alg"]
     })
   end
 end

@@ -22,7 +22,7 @@ defmodule Hashpay.Application do
       # PubSub para comunicación entre procesos
       Hashpay.Hits,
       Hashpay.PubSub,
-      {Hashpay.Broker, name: :cluster},
+      {Hashpay.Cluster, name: :cluster},
       # Conexión a ScyllaDB
       {Hashpay.DB, db_opts},
       # Servidor HTTP

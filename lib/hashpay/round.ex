@@ -90,7 +90,7 @@ defmodule Hashpay.Round do
       ...>   txs: 20,
       ...>   size: 5120,
       ...>   status: 0,
-      ...>   timestamp: System.os_time(:second),
+      ...>   timestamp: 1_500_123_456_789,
       ...>   blocks: blocks_list
       ...> }, private_key)
       %Hashpay.Round{...}
@@ -99,7 +99,7 @@ defmodule Hashpay.Round do
     # Asegurarse de que timestamp y vsn estén presentes
     attrs =
       attrs
-      |> Map.put_new_lazy(:timestamp, fn -> System.os_time(:second) end)
+      |> Map.put_new_lazy(:timestamp, fn -> System.os_time(:millisecond) end)
       |> Map.put_new(:vsn, 1)
 
     # Crear una ronda sin hash ni firma
@@ -121,15 +121,11 @@ defmodule Hashpay.Round do
   def calculate_hash(round) do
     # Extraer los campos relevantes para el hash
     fields = [
-      Integer.to_string(round.id),
       round.prev,
       round.creator,
       Integer.to_string(round.reward),
       Integer.to_string(round.count),
       Integer.to_string(round.txs),
-      Integer.to_string(round.size),
-      Integer.to_string(round.status),
-      Integer.to_string(round.timestamp),
       Integer.to_string(round.vsn)
     ]
 
@@ -143,7 +139,9 @@ defmodule Hashpay.Round do
       end
 
     # Unir los campos y calcular el hash
-    :crypto.hash(:sha256, Enum.join(fields ++ block_hashes, "|"))
+    <<hash::192, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields ++ block_hashes, "|"))
+
+    [<<round.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end
 
   @doc """

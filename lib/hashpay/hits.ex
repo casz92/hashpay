@@ -89,6 +89,7 @@ defmodule Hashpay.Hits do
     :ets.select(@table_name, match_spec)
   end
 
+  @spec remove(any()) :: true
   def remove(id) do
     :ets.delete(@table_name, id)
   end

@@ -17,6 +17,8 @@ defmodule Hashpay.Balance do
     updated: 0
   ]
 
+  @default_currency Application.compile_env(:hashpay, :default_currency)
+
   @impl true
   def up do
     conn = DB.get_conn_with_retry()
@@ -41,6 +43,15 @@ defmodule Hashpay.Balance do
     """
 
     DB.execute(conn, statement)
+  end
+
+  def new(account_id, amount \\ 0) do
+    %__MODULE__{
+      id: account_id,
+      balances: %{@default_currency => amount},
+      creation: Hashpay.get_last_round_id(),
+      updated: Hashpay.get_last_round_id()
+    }
   end
 
   def drop_table(conn) do
@@ -161,8 +172,21 @@ defmodule Hashpay.Balance do
     :ets.tab2list(:balances)
   end
 
+  @spec incr(tuple(), integer()) :: integer()
+  def incr(tuple, amount) do
+    result = :ets.update_counter(:balances, tuple, {2, amount}, {tuple, 0 + amount})
+    Hits.hit_write(tuple, :balance)
+    result
+  end
+
+  def delete(batch, id, name) do
+    Xandra.Batch.add(batch, delete_prepared(), [{"text", name}, {"text", id}])
+    remove({id, name})
+  end
+
+  @spec remove(tuple()) :: true
   def remove(tuple) do
-    :ets.delete(:balances, {tuple, :delete})
+    :ets.delete(:balances, tuple)
     Hits.remove(tuple)
   end
 
