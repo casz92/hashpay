@@ -53,13 +53,11 @@ defmodule Hashpay.Validator do
     :updated
   ]
 
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
   end
 
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 

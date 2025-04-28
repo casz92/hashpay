@@ -10,6 +10,7 @@ import_config "genesis.exs"
 
 # Configuración del validador
 config :hashpay, :channel, "first"
+config :hashpay, :threads, System.schedulers_online()
 
 # Importar configuraciones específicas del entorno
 import_config "#{config_env()}.exs"

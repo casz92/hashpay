@@ -23,8 +23,11 @@ defmodule Hashpay.WebSocketClientTest do
 
   @tag :integration
   test "start_link con suscripciones iniciales" do
-    {:ok, client} = WebSocketClient.start_link("ws://localhost:4000/ws",
-      subscriptions: ["canal_test"])
+    {:ok, client} =
+      WebSocketClient.start_link("ws://localhost:4000/ws",
+        subscriptions: ["canal_test"]
+      )
+
     assert is_pid(client)
 
     # Dar tiempo para que se establezca la conexión y se suscriba

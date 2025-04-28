@@ -63,6 +63,16 @@ defmodule Hashpay.DB do
     end
   end
 
+  def get_batch do
+    :persistent_term.get(:batch, nil)
+  end
+
+  def new_batch(type \\ :unlogged) do
+    batch = Xandra.Batch.new(type)
+    :persistent_term.put(:batch, batch)
+    batch
+  end
+
   @doc """
   Ejecuta una consulta CQL.
 

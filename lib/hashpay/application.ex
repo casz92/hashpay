@@ -74,12 +74,10 @@ defmodule Hashpay.Application do
   end
 
   defp make_folders do
-    priv = Application.app_dir(:hashpay, "priv")
-    blocks = Application.get_env(:hashpay, :block_folder, "blocks")
+    data_folder = Application.get_env(:hashpay, :data_folder)
 
     [
-      Path.join(priv, "certs"),
-      Path.join(priv, blocks)
+      Path.join(data_folder, "blocks")
     ]
     |> Enum.each(&File.mkdir_p!/1)
   end

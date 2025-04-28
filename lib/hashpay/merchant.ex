@@ -37,15 +37,16 @@ defmodule Hashpay.Merchant do
     :updated
   ]
 
+  @prefix "mc_"
+  @regex ~r/^mc_[a-zA-Z0-9]$/
+
   @impl true
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
   end
 
   @impl true
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 
@@ -72,11 +73,24 @@ defmodule Hashpay.Merchant do
     DB.execute(conn, statement)
   end
 
+  def create_ets_table do
+    :ets.new(:merchants, [:set, :public, :named_table])
+  end
+
+  def generate_id(pubkey) do
+    <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
+    IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
+  end
+
+  def match?(id) do
+    Regex.match?(@regex, id)
+  end
+
   def new(attrs) do
     last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
-      id: Hashpay.gen_id("mer_"),
+      id: generate_id(attrs[:pubkey]),
       name: attrs[:name],
       channel: attrs[:channel],
       pubkey: attrs[:pubkey],

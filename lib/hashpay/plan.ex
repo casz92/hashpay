@@ -42,14 +42,12 @@ defmodule Hashpay.Plan do
   @prefix "plan_"
 
   @impl true
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
   end
 
   @impl true
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 

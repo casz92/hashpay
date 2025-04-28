@@ -107,8 +107,9 @@ defmodule Hashpay.MixProject do
       {:ex_aws_s3, "~> 2.5"},
       {:poison, "~> 3.0"},
       {:hackney, "~> 1.9"},
-      # Fresh - Cliente para WebSockets
+      # Cliente para WebSocket
       {:websocket_client, "~> 1.0"},
+      # Cliente para descarga de archivos
       {:download, "~> 0.0.4"}
     ]
   end

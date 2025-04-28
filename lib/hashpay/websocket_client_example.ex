@@ -18,9 +18,11 @@ defmodule Hashpay.WebSocketClientExample do
   """
   def run(uri \\ "ws://localhost:4000/ws") do
     # Iniciar el cliente con suscripciones iniciales
-    {:ok, client} = Hashpay.WebSocketClient.start_link(uri,
-      message_handler: &handle_message/1,
-      subscriptions: ["canal_principal"])
+    {:ok, client} =
+      Hashpay.WebSocketClient.start_link(uri,
+        message_handler: &handle_message/1,
+        subscriptions: ["canal_principal"]
+      )
 
     # Esperar a que se establezca la conexión
     Process.sleep(1000)
@@ -35,10 +37,14 @@ defmodule Hashpay.WebSocketClientExample do
     })
 
     # Enviar un mensaje a un canal específico
-    Hashpay.WebSocketClient.push(client, %{
-      type: "data",
-      value: Enum.random(1..100)
-    }, "noticias")
+    Hashpay.WebSocketClient.push(
+      client,
+      %{
+        type: "data",
+        value: Enum.random(1..100)
+      },
+      "noticias"
+    )
 
     # Esperar un tiempo para ver los mensajes
     Process.sleep(5000)

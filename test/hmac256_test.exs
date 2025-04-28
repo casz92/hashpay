@@ -12,7 +12,8 @@ defmodule HMAC256Test do
       expected_hmac = HMAC256.generate(secret, message)
 
       assert is_binary(expected_hmac)
-      assert String.length(expected_hmac) == 64  # SHA-256 produce 32 bytes (64 caracteres hex)
+      # SHA-256 produce 32 bytes (64 caracteres hex)
+      assert String.length(expected_hmac) == 64
     end
 
     test "generates different HMACs for different messages" do
@@ -65,7 +66,10 @@ defmodule HMAC256Test do
       # Asegurarse de que el HMAC inválido es realmente diferente
       valid_hmac = HMAC256.generate(secret, message)
       # Si por casualidad el HMAC inválido coincide con el válido, generamos uno diferente
-      invalid_hmac = if invalid_hmac == valid_hmac, do: "f" <> String.slice(valid_hmac, 1..-1//1), else: invalid_hmac
+      invalid_hmac =
+        if invalid_hmac == valid_hmac,
+          do: "f" <> String.slice(valid_hmac, 1..-1//1),
+          else: invalid_hmac
 
       assert HMAC256.verify(secret, message, invalid_hmac) == false
     end

@@ -7,6 +7,6 @@ defmodule Hashpay.MigrationBehaviour do
   - down: Función para deshacer la migración
   """
 
-  @callback up() :: :ok | {:error, term()}
-  @callback down() :: :ok | {:error, term()}
+  @callback up(conn :: pid()) :: no_return()
+  @callback down(conn :: pid()) :: no_return()
 end

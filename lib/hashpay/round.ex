@@ -235,8 +235,7 @@ defmodule Hashpay.Round do
 
   # Sobrescribir funciones específicas del behaviour Storable
 
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
   end
 
@@ -279,8 +278,7 @@ defmodule Hashpay.Round do
     DB.execute(conn, statement)
   end
 
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 

@@ -108,8 +108,7 @@ defmodule Hashpay.Variable do
     end
   end
 
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
 
     Xandra.Batch.new()
@@ -119,8 +118,7 @@ defmodule Hashpay.Variable do
     |> Xandra.execute(conn)
   end
 
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 end

@@ -23,10 +23,15 @@ defmodule Hashpay.Account do
   ]
 
   @prefix "ac_"
+  @regex ~r/^ac_[a-zA-Z0-9]$/
 
   def generate_id(pubkey) do
     <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
-    IO.iodata_to_binary([@prefix, Base.encode16(first16bytes)])
+    IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
+  end
+
+  def match?(id) do
+    Regex.match?(@regex, id)
   end
 
   def new(attrs) do
@@ -39,13 +44,11 @@ defmodule Hashpay.Account do
     }
   end
 
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
   end
 
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 

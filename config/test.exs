@@ -21,7 +21,8 @@ config :hashpay, :poolboy,
 
 # Configuración para Broadway
 config :hashpay, :broadway,
-  producer_module: nil,  # Módulo productor a definir
+  # Módulo productor a definir
+  producer_module: nil,
   processors: [
     default: [concurrency: 1]
   ],

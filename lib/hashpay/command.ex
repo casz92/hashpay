@@ -11,49 +11,65 @@ defmodule Hashpay.Command do
   - signature: Firma digital del emisor
   """
   @type t :: %__MODULE__{
-      hash: binary() | nil,
-      fun: String.t() | pos_integer(),
-      args: list() | nil,
-      from: String.t() | nil,
-      signature: binary() | nil,
-      timestamp: non_neg_integer()
-  }
+          hash: binary() | nil,
+          fun: String.t() | pos_integer(),
+          args: list() | nil,
+          from: String.t() | nil,
+          size: non_neg_integer(),
+          signature: binary() | nil,
+          timestamp: non_neg_integer()
+        }
 
   defstruct [
     :hash,
     :fun,
     :args,
     :from,
+    :size,
     :signature,
     :timestamp
   ]
 
-  def new(attrs) do
+  alias Hashpay.DB
+  alias Hashpay.Merchant
+  alias Hashpay.Account
+  alias Hashpay.Function.Context
+  alias Hashpay.Functions
+
+  def new(attrs, size) do
     %__MODULE__{
-      hash: attrs[:hash],
-      fun: attrs[:fun],
-      args: attrs[:args],
-      from: attrs[:from],
-      signature: attrs[:signature],
-      timestamp: attrs[:timestamp]
+      fun: attrs["fun"],
+      args: attrs["args"],
+      from: attrs["from"],
+      size: size,
+      signature: attrs["signature"],
+      timestamp: attrs["timestamp"]
     }
+    |> put_hash()
   end
 
+  @spec encode(t()) :: String.t()
   def encode(%__MODULE__{} = command) do
     Jason.encode!(command)
   end
 
+  @spec decode(String.t()) :: t()
   def decode(json) do
-    Jason.decode!(json, keys: :atoms)
+    Jason.decode!(json)
+    |> new(byte_size(json))
   end
 
   def hash(command) do
     :crypto.hash(:sha256, encode(command))
   end
 
-  def verify_hash(command, hash) do
-    hash(command) == hash
+  defp put_hash(command) do
+    %{command | hash: hash(command)}
   end
+
+  # def verify_hash(command, hash) do
+  #   hash(command) == hash
+  # end
 
   def sign(command, private_key) do
     {:ok, signature} = Cafezinho.Impl.sign(hash(command), private_key)
@@ -64,60 +80,51 @@ defmodule Hashpay.Command do
     Cafezinho.Impl.verify(command.signature, command.hash, public_key)
   end
 
+  @spec fetch_sender(pid(), String.t()) ::
+          {:ok, Account.t() | Merchant.t()} | {:error, :not_found} | {:error, String.t()}
+  def fetch_sender(conn, id) do
+    cond do
+      Account.match?(id) ->
+        Account.fetch(conn, id)
 
-end
+      Merchant.match?(id) ->
+        Merchant.fetch(conn, id)
 
-defmodule Hashpay.Function do
- @moduledoc """
- Estructura para las funciones de la blockchain de Hashpay.
-
-  Una función contiene:
-  - id: Identificador único de la función
-  - name: Nombre de la función
-  - mod: Módulo que contiene la función
-  - fun: Nombre de la función
-  - auth_type: Tipo de autenticación requerida (0: ninguna, 1: firma digital)
-  - segment: Segmento de la blockchain donde se ejecuta la función
- """
-
-  defstruct [
-    :id,
-    :name,
-    :mod,
-    :fun,
-    :auth_type,
-    segment: 0
-  ]
-
-  @type t :: %__MODULE__{
-    id: pos_integer(),
-    name: String.t(),
-    mod: module(),
-    fun: atom(),
-    auth_type: 0 | 1,
-    segment: number()
-  }
-
-  alias Hashpay.Function
-
-  def list do
-    [
-      %Function{id: 1, name: "createAccount", mod: Hashpay.Account.Commands, fun: :create, auth_type: 0},
-      %Function{id: 2, name: "changePubkeyAccount", mod: Hashpay.Account.Commands, fun: :change_pubkey, auth_type: 1},
-      %Function{id: 3, name: "changeNameAccount", mod: Hashpay.Account.Commands, fun: :change_name, auth_type: 1},
-      %Function{id: 4, name: "changeChannelAccount", mod: Hashpay.Account.Commands, fun: :change_channel, auth_type: 1},
-      %Function{id: 5, name: "verifyAccount", mod: Hashpay.Account.Commands, fun: :verify, auth_type: 1},
-
-      %Function{id: 10, name: "createCurrency", mod: Hashpay.Currency.Commands, fun: :create, auth_type: 1},
-      %Function{id: 11, name: "changePubkeyCurrency", mod: Hashpay.Currency.Commands, fun: :change_pubkey, auth_type: 1},
-      %Function{id: 12, name: "changeNameCurrency", mod: Hashpay.Currency.Commands, fun: :change_name, auth_type: 1},
-
-
-
-
-    ]
+      true ->
+        {:error, "Invalid sender"}
+    end
   end
 
+  @spec handle(t()) :: {:ok, any()} | {:error, String.t()}
+  def handle(command) do
+    case Functions.get(command.fun) do
+      {:ok, function} ->
+        conn = DB.get_conn()
 
+        case fetch_sender(conn, command.from) do
+          {:ok, sender} ->
+            cond do
+              function.auth_type == 1 && !verify_signature(command, sender.public_key) ->
+                {:error, "Invalid signature"}
 
+              true ->
+                context = Context.new(command, function, sender)
+
+                case apply(function.mod, function.fun, [context | command.args]) do
+                  {:error, reason} -> {:error, reason}
+                  result -> result
+                end
+            end
+
+          {:error, :not_found} ->
+            {:error, "Sender not found"}
+
+          error_sender ->
+            error_sender
+        end
+
+      _ ->
+        {:error, "Function not found"}
+    end
+  end
 end

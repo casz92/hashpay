@@ -29,6 +29,8 @@ deps
 _build/
 _checkouts/
 
+priv/data
+
 # compress archives, libraries and executables
 *.zip
 *.rar
@@ -51,3 +53,4 @@ _checkouts/
 *.lib
 *.obj
 *.exe
+*.db

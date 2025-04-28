@@ -68,12 +68,26 @@ if config_env() == :prod do
     max_overflow: poolboy_max_overflow
 end
 
+# Configuración de la carpeta de datos
+config :hashpay, :data_folder, System.get_env("DATA_FOLDER", "priv/data")
+
+s3_scheme = "https://"
+s3_host = "localhost"
+s3_region = "lon"
+
 config :ex_aws,
   access_key_id: "DOM",
   secret_access_key: "secret",
   region: "lon",
   s3: [
-    scheme: "https://",
-    host: "localhost",
-    region: "lon"
+    scheme: s3_scheme,
+    host: s3_host,
+    region: s3_region
   ]
+
+config :hashpay, :s3_endpoint, [s3_scheme, s3_region, ".", s3_host] |> IO.iodata_to_binary()
+config :hashpay, :s3_bucket, System.get_env("S3_BUCKET", "my-bucket")
+
+config :hashpay,
+       :deny_function,
+       System.get_env("DENY_FUNCTION", "") |> String.split(",", trim: true)

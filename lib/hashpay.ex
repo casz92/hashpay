@@ -8,9 +8,9 @@ defmodule Hashpay do
           :account
           | :block
           | :round
-          | :tx
           | :merchant
           | :currency
+          | :balance
           | :validator
           | :member
           | :balance
@@ -18,6 +18,8 @@ defmodule Hashpay do
           | :plan
           | :payday
           | :lottery
+          | :lottery_ticket
+          | :paystream
 
   def gen_id do
     time =

@@ -12,9 +12,10 @@ defmodule Hashpay.Router do
   plug(:match)
 
   plug(Plug.Parsers,
-    parsers: [:json, :urlencoded, :multipart],
-    pass: ["*/*"],
-    json_decoder: Jason
+    # parsers: [:json, :urlencoded, :multipart],
+    parsers: [:urlencoded, :multipart],
+    pass: ["*/*"]
+    # json_decoder: Jason
   )
 
   plug(:dispatch)
@@ -22,6 +23,22 @@ defmodule Hashpay.Router do
   # Ruta de ejemplo que responde "it works!"
   get "/" do
     send_resp(conn, 200, "it works!")
+  end
+
+  alias Hashpay.Command
+
+  post "/command" do
+    {:ok, body, _conn} = read_body(conn)
+    command = Command.decode(body)
+
+    case Command.handle(command) do
+      {:error, reason} ->
+        Logger.error("Error handling command: #{reason}")
+        send_resp(conn, 400, %{"error" => reason} |> Jason.encode!())
+
+      _ ->
+        send_resp(conn, 200, "OK")
+    end
   end
 
   # Ruta de estado para verificar que el servidor está funcionando

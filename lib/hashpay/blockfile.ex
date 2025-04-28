@@ -22,18 +22,17 @@ defmodule Hashpay.Blockfile do
 
   def donwload(block_id) do
     url = remote_url(block_id)
+    local_path = pathfile(block_id)
 
-    case Download.from(url, pathfile(block_id)) do
-      {:ok, _} -> :ok
+    case Download.from(url, path: local_path) do
       {:error, reason} -> {:error, reason}
+      ok_url -> ok_url
     end
   end
 
   def remote_url(block_id) do
     [
-      "https://",
-      Application.get_env(:hashpay, :s3_bucket, "my-bucket"),
-      ".s3.amazonaws.com",
+      Application.get_env(:ex_aws, :s3_endpoint),
       "/blocks/",
       block_id,
       ".cbor"
@@ -42,10 +41,11 @@ defmodule Hashpay.Blockfile do
   end
 
   defp pathfile(block_id) do
-    folder = Application.get_env(:hashpay, :block_folder, "blocks")
+    folder = Application.get_env(:hashpay, :block_folder)
 
     [
       folder,
+      "blocks",
       "#{block_id}.cbor"
     ]
     |> Path.join()

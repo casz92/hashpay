@@ -266,8 +266,7 @@ defmodule Hashpay.Block do
     end)
   end
 
-  def up do
-    conn = DB.get_conn_with_retry()
+  def up(conn) do
     create_table(conn)
   end
 
@@ -276,8 +275,7 @@ defmodule Hashpay.Block do
     DB.execute(conn, statement)
   end
 
-  def down do
-    conn = DB.get_conn_with_retry()
+  def down(conn) do
     drop_table(conn)
   end
 
