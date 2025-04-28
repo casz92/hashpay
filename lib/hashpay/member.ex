@@ -68,48 +68,40 @@ defmodule Hashpay.Member do
     }
   end
 
-  def save(conn, %__MODULE__{} = member) do
-    statement = """
+  def prepare_statements!(conn) do
+    insert_prepared = """
     INSERT INTO members (group_id, member_id, creation, meta)
     VALUES (?, ?, ?, ?);
     """
 
-    params = [
+    delete_statement = "DELETE FROM members WHERE group_id = ? AND member_id = ?;"
+
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    delete_prepared = Xandra.prepare!(conn, delete_statement)
+
+    :persistent_term.put({:stmt, "members_insert"}, insert_prepared)
+    :persistent_term.put({:stmt, "members_delete"}, delete_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "members_insert"})
+  end
+
+  def delete_prepared do
+    :persistent_term.get({:stmt, "members_delete"})
+  end
+
+  def batch_save(batch, member) do
+    Xandra.Batch.add(batch, insert_prepared(), [
       {"text", member.group_id},
       {"text", member.member_id},
       {"bigint", member.creation},
       {"map<text, text>", member.meta}
-    ]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, member}
-      error -> error
-    end
+    ])
   end
 
-  def batch_save!(conn, members) do
-    batch = Xandra.Batch.new()
-
-    statement = """
-    INSERT INTO members (group_id, member_id, creation, meta)
-    VALUES (?, ?, ?, ?);
-    """
-
-    prepared = Xandra.prepare!(conn, statement)
-
-    batch =
-      Enum.reduce(members, batch, fn member, batch ->
-        params = [
-          {"text", member.group_id},
-          {"text", member.member_id},
-          {"bigint", member.creation},
-          {"map<text, text>", member.meta}
-        ]
-
-        Xandra.Batch.add(batch, prepared, params)
-      end)
-
-    DB.execute!(conn, batch)
+  def batch_delete(batch, group_id, member_id) do
+    Xandra.Batch.add(batch, delete_prepared(), [{"text", group_id}, {"text", member_id}])
   end
 
   @spec exists?(pid(), String.t(), String.t()) :: boolean()

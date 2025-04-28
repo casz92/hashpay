@@ -58,21 +58,38 @@ defmodule Hashpay.Variable do
     DB.execute(conn, statement)
   end
 
-  def save(conn, %__MODULE__{} = variable) do
-    statement = """
+  def prepare_statements!(conn) do
+    insert_prepared = """
     INSERT INTO variables (key, value)
-    VALUES (?, ?, ?);
+    VALUES (?, ?);
     """
 
-    params = [
-      {"text", variable.key},
-      {"blob", variable.value}
-    ]
+    delete_statement = "DELETE FROM variables WHERE key = ?;"
 
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, variable}
-      error -> error
-    end
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    delete_prepared = Xandra.prepare!(conn, delete_statement)
+
+    :persistent_term.put({:stmt, "variables_insert"}, insert_prepared)
+    :persistent_term.put({:stmt, "variables_delete"}, delete_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "variables_insert"})
+  end
+
+  def delete_prepared do
+    :persistent_term.get({:stmt, "variables_delete"})
+  end
+
+  def batch_save(batch, variable) do
+    Xandra.Batch.add(batch, insert_prepared(), [
+      {"text", variable.key},
+      {"blob", variable.value |> :erlang.term_to_binary()}
+    ])
+  end
+
+  def batch_delete(batch, key) do
+    Xandra.Batch.add(batch, delete_prepared(), [{"text", key}])
   end
 
   def load_all(conn) do
@@ -93,11 +110,13 @@ defmodule Hashpay.Variable do
 
   def up do
     conn = DB.get_conn_with_retry()
-
     create_table(conn)
-    save(conn, %Variable{key: "round_rewarded_base", value: 10})
-    save(conn, %Variable{key: "round_rewarded_transactions", value: 0.1})
-    save(conn, %Variable{key: "round_size_target", value: 0.05})
+
+    Xandra.Batch.new()
+    |> batch_save(%Variable{key: "round_rewarded_base", value: 10})
+    |> batch_save(%Variable{key: "round_rewarded_transactions", value: 0.1})
+    |> batch_save(%Variable{key: "round_size_target", value: 0.05})
+    |> Xandra.execute(conn)
   end
 
   def down do

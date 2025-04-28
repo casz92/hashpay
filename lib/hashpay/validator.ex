@@ -7,7 +7,6 @@ defmodule Hashpay.Validator do
   - hostname: Nombre de host del validador
   - port: Puerto de escucha del validador
   - name: Nombre del validador
-  - owner: Propietario del validador (dirección pública)
   - channel: Canal al que pertenece el validador
   - pubkey: Clave pública del validador
   - picture: URL de la imagen del validador
@@ -27,7 +26,6 @@ defmodule Hashpay.Validator do
           hostname: String.t(),
           port: integer(),
           name: String.t(),
-          owner: binary(),
           channel: String.t(),
           pubkey: binary(),
           picture: Path.t() | String.t() | nil,
@@ -44,7 +42,6 @@ defmodule Hashpay.Validator do
     :hostname,
     :port,
     :name,
-    :owner,
     :channel,
     :pubkey,
     :picture,
@@ -73,7 +70,6 @@ defmodule Hashpay.Validator do
       hostname text,
       port int,
       name text,
-      owner blob,
       channel text,
       pubkey blob,
       picture text,
@@ -120,7 +116,6 @@ defmodule Hashpay.Validator do
       hostname: attrs[:hostname],
       port: attrs[:port],
       name: attrs[:name],
-      owner: attrs[:owner],
       channel: attrs[:channel],
       pubkey: attrs[:pubkey],
       picture: attrs[:picture],
@@ -133,18 +128,35 @@ defmodule Hashpay.Validator do
     }
   end
 
-  def save(conn, %__MODULE__{} = validator) do
-    statement = """
-    INSERT INTO validators (id, hostname, port, name, owner, channel, pubkey, picture, factor_a, factor_b, active, failures, creation, updated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  def prepare_statements!(conn) do
+    insert_prepared = """
+    INSERT INTO validators (id, hostname, port, name, channel, pubkey, picture, factor_a, factor_b, active, failures, creation, updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    params = [
+    delete_statement = "DELETE FROM validators WHERE id = ?;"
+
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    delete_prepared = Xandra.prepare!(conn, delete_statement)
+
+    :persistent_term.put({:stmt, "validators_insert"}, insert_prepared)
+    :persistent_term.put({:stmt, "validators_delete"}, delete_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "validators_insert"})
+  end
+
+  def delete_prepared do
+    :persistent_term.get({:stmt, "validators_delete"})
+  end
+
+  def batch_save(batch, validator) do
+    Xandra.Batch.add(batch, insert_prepared(), [
       {"text", validator.id},
       {"text", validator.hostname},
       {"int", validator.port},
       {"text", validator.name},
-      {"blob", validator.owner},
       {"text", validator.channel},
       {"blob", validator.pubkey},
       {"text", validator.picture},
@@ -154,12 +166,11 @@ defmodule Hashpay.Validator do
       {"int", validator.failures},
       {"bigint", validator.creation},
       {"bigint", validator.updated}
-    ]
+    ])
+  end
 
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, validator}
-      error -> error
-    end
+  def batch_delete(batch, id) do
+    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
   end
 
   def get(conn, id) do
@@ -249,7 +260,7 @@ defmodule Hashpay.Validator do
   def update(conn, %__MODULE__{} = validator) do
     statement = """
     UPDATE validators
-    SET hostname = ?, port = ?, name = ?, owner = ?, channel = ?, pubkey = ?, picture = ?, factor_a = ?, factor_b = ?, active = ?, failures = ?, updated = ?
+    SET hostname = ?, port = ?, name = ?, channel = ?, pubkey = ?, picture = ?, factor_a = ?, factor_b = ?, active = ?, failures = ?, updated = ?
     WHERE id = ?;
     """
 
@@ -257,7 +268,6 @@ defmodule Hashpay.Validator do
       {"text", validator.hostname},
       {"int", validator.port},
       {"text", validator.name},
-      {"blob", validator.owner},
       {"text", validator.channel},
       {"blob", validator.pubkey},
       {"text", validator.picture},
@@ -305,7 +315,6 @@ defmodule Hashpay.Validator do
       hostname: row["hostname"],
       port: row["port"],
       name: row["name"],
-      owner: row["owner"],
       channel: row["channel"],
       pubkey: row["pubkey"],
       picture: row["picture"],

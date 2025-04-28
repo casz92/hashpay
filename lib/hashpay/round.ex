@@ -254,10 +254,10 @@ defmodule Hashpay.Round do
       size int,
       status tinyint,
       timestamp bigint,
-      blocks list<blob>,
+      blocks frozen<list<blob>>,
       vsn int,
       PRIMARY KEY (id)
-    ) with clustering order by (id desc);
+    ) with clustering order by (id DESC);
     """
 
     DB.execute(conn, statement)
@@ -284,15 +284,23 @@ defmodule Hashpay.Round do
     drop_table(conn)
   end
 
-  def save(conn, %__MODULE__{} = round) do
-    # Los bloques ya son una lista de hashes binarios, no necesitan conversión
-    # Llamar a la implementación por defecto
-    statement = """
+  def prepare_statements!(conn) do
+    insert_prepared = """
     INSERT INTO rounds (id, hash, prev, creator, signature, reward, count, txs, size, status, timestamp, blocks, vsn)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    params = [
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+
+    :persistent_term.put({:stmt, "rounds_insert"}, insert_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "rounds_insert"})
+  end
+
+  def batch_save(batch, round) do
+    Xandra.Batch.add(batch, insert_prepared(), [
       {"bigint", round.id},
       {"blob", round.hash},
       {"blob", round.prev},
@@ -304,14 +312,9 @@ defmodule Hashpay.Round do
       {"int", round.size},
       {"tinyint", round.status},
       {"bigint", round.timestamp},
-      {"list<blob>", round.blocks},
+      {"frozen<list<blob>>", round.blocks},
       {"int", round.vsn}
-    ]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, round}
-      error -> error
-    end
+    ])
   end
 
   def get(conn, id) do

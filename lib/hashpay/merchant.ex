@@ -127,26 +127,20 @@ defmodule Hashpay.Merchant do
     Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
   end
 
-  def save(conn, %__MODULE__{} = merchant) do
-    statement = """
-    INSERT INTO merchants (id, name, channel, pubkey, picture, active, creation, updated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    params = [
-      {"text", merchant.id},
-      {"text", merchant.name},
-      {"text", merchant.channel},
-      {"blob", merchant.pubkey},
-      {"text", merchant.picture},
-      {"boolean", merchant.active},
-      {"bigint", merchant.creation},
-      {"bigint", merchant.updated}
-    ]
+  def count(conn) do
+    statement = "SELECT COUNT(*) FROM merchants;"
+    params = []
 
     case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, merchant}
-      error -> error
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [row] -> {:ok, row["count"]}
+          [] -> {:error, :not_found}
+          _ -> {:error, :multiple_results}
+        end
+
+      error ->
+        error
     end
   end
 

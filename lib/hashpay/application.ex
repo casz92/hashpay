@@ -8,6 +8,8 @@ defmodule Hashpay.Application do
   @impl true
   def start(_type, _args) do
     # Obtener configuración del entorno
+    make_folders()
+
     version = vsn()
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
@@ -69,6 +71,17 @@ defmodule Hashpay.Application do
   # Función auxiliar para obtener la ruta de los certificados
   defp cert_path(file) do
     Path.join(Application.app_dir(:hashpay, "priv/certs"), file)
+  end
+
+  defp make_folders do
+    priv = Application.app_dir(:hashpay, "priv")
+    blocks = Application.get_env(:hashpay, :block_folder, "blocks")
+
+    [
+      Path.join(priv, "certs"),
+      Path.join(priv, blocks)
+    ]
+    |> Enum.each(&File.mkdir_p!/1)
   end
 
   defp vsn do

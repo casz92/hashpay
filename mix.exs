@@ -100,7 +100,16 @@ defmodule Hashpay.MixProject do
       {:nimble_totp, "~> 1.0"},
 
       # Phoenix PubSub - Sistema de publicación/suscripción
-      {:phoenix_pubsub, "~> 2.1"}
+      {:phoenix_pubsub, "~> 2.1"},
+
+      # ExAws - Cliente para AWS
+      {:ex_aws, "~> 2.5"},
+      {:ex_aws_s3, "~> 2.5"},
+      {:poison, "~> 3.0"},
+      {:hackney, "~> 1.9"},
+      # Fresh - Cliente para WebSockets
+      {:websocket_client, "~> 1.0"},
+      {:download, "~> 0.0.4"}
     ]
   end
 end

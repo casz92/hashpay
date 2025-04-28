@@ -5,7 +5,7 @@ defmodule Hashpay.Currency do
   Una moneda contiene:
   - id: Identificador único de la moneda
   - name: Nombre de la moneda
-  - owner: Propietario de la moneda (dirección pública)
+  - pubkey: Clave pública del propietario de la moneda
   - picture: URL de la imagen de la moneda
   - decimal: Número de decimales de la moneda
   - symbol: Símbolo de la moneda
@@ -20,7 +20,7 @@ defmodule Hashpay.Currency do
   @type t :: %__MODULE__{
           id: String.t(),
           name: String.t(),
-          owner: binary() | nil,
+          pubkey: binary() | nil,
           picture: String.t() | nil,
           decimal: non_neg_integer(),
           symbol: String.t(),
@@ -33,7 +33,7 @@ defmodule Hashpay.Currency do
   @enforce_keys [
     :id,
     :name,
-    :owner,
+    :pubkey,
     :picture,
     :decimal,
     :symbol,
@@ -46,7 +46,7 @@ defmodule Hashpay.Currency do
   defstruct [
     :id,
     :name,
-    :owner,
+    :pubkey,
     :picture,
     :decimal,
     :symbol,
@@ -71,7 +71,7 @@ defmodule Hashpay.Currency do
     CREATE TABLE IF NOT EXISTS currencies (
       id text,
       name text,
-      owner blob,
+      pubkey blob,
       picture text,
       decimal int,
       symbol text,
@@ -117,7 +117,7 @@ defmodule Hashpay.Currency do
     %__MODULE__{
       id: generate_id(attrs[:id]),
       name: attrs[:name],
-      owner: attrs[:owner],
+      pubkey: attrs[:pubkey],
       picture: attrs[:picture],
       decimal: attrs[:decimal],
       symbol: attrs[:symbol],
@@ -128,16 +128,90 @@ defmodule Hashpay.Currency do
     }
   end
 
+  def prepare_statements!(conn) do
+    insert_prepared = """
+    INSERT INTO currencies (id, name, pubkey, picture, decimal, symbol, max_supply, props, creation, updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    """
+
+    delete_statement = "DELETE FROM currencies WHERE id = ?;"
+
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    delete_prepared = Xandra.prepare!(conn, delete_statement)
+
+    :persistent_term.put({:stmt, "currencies_insert"}, insert_prepared)
+    :persistent_term.put({:stmt, "currencies_delete"}, delete_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "currencies_insert"})
+  end
+
+  def delete_prepared do
+    :persistent_term.get({:stmt, "currencies_delete"})
+  end
+
+  def batch_save(batch, currency) do
+    Xandra.Batch.add(batch, insert_prepared(), [
+      {"text", currency.id},
+      {"text", currency.name},
+      {"blob", currency.pubkey},
+      {"text", currency.picture},
+      {"int", currency.decimal},
+      {"text", currency.symbol},
+      {"bigint", currency.max_supply},
+      {"list<text>", currency.props},
+      {"bigint", currency.creation},
+      {"bigint", currency.updated}
+    ])
+  end
+
+  def batch_delete(batch, id) do
+    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+  end
+
+  def batch_update_fields(batch, map, id) do
+    set_clause =
+      Enum.map_join(map, ", ", fn {field, value} ->
+        "#{field} = :#{value}"
+      end)
+
+    statement = """
+    UPDATE currencies
+    SET #{set_clause}
+    WHERE id = :id;
+    """
+
+    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
+  end
+
+  def count(conn) do
+    statement = "SELECT COUNT(*) FROM currencies;"
+    params = []
+
+    case DB.execute(conn, statement, params) do
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [row] -> {:ok, row["count"]}
+          [] -> {:error, :not_found}
+          _ -> {:error, :multiple_results}
+        end
+
+      error ->
+        error
+    end
+  end
+
   def update(conn, %__MODULE__{} = currency) do
     statement = """
     UPDATE currencies
-    SET name = ?, owner = ?, picture = ?, decimal = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
+    SET name = ?, pubkey = ?, picture = ?, decimal = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
     WHERE id = ?;
     """
 
     params = [
       {"text", currency.name},
-      {"blob", currency.owner},
+      {"blob", currency.pubkey},
       {"text", currency.picture},
       {"int", currency.decimal},
       {"text", currency.symbol},
@@ -176,7 +250,7 @@ defmodule Hashpay.Currency do
 
     update_statement = """
     UPDATE currencies
-    SET name = ?, owner = ?, picture = ?, decimal = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
+    SET name = ?, pubkey = ?, picture = ?, decimal = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
     WHERE id = ?;
     """
 
@@ -196,7 +270,7 @@ defmodule Hashpay.Currency do
       {_id, currency} ->
         params = [
           {"text", currency.name},
-          {"blob", currency.owner},
+          {"blob", currency.pubkey},
           {"text", currency.picture},
           {"int", currency.decimal},
           {"text", currency.symbol},
@@ -293,7 +367,7 @@ defmodule Hashpay.Currency do
     struct!(__MODULE__, %{
       id: row["id"],
       name: row["name"],
-      owner: row["owner"],
+      pubkey: row["pubkey"],
       picture: row["picture"],
       decimal: row["decimal"],
       symbol: row["symbol"],

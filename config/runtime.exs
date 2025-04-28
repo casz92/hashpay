@@ -67,3 +67,13 @@ if config_env() == :prod do
     size: poolboy_size,
     max_overflow: poolboy_max_overflow
 end
+
+config :ex_aws,
+  access_key_id: "DOM",
+  secret_access_key: "secret",
+  region: "lon",
+  s3: [
+    scheme: "https://",
+    host: "localhost",
+    region: "lon"
+  ]

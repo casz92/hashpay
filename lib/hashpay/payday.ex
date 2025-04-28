@@ -8,7 +8,7 @@ defmodule Hashpay.Payday do
   - currency_id: Identificador de la moneda del payday
   - amount: Cantidad de la moneda en el payday
   - last_payday: Último payday procesado
-  - last_stream: Último stream procesado
+  - last_withdraw: Último retiro procesado
   - creation: Marca de tiempo de creación del payday
   """
   alias Hashpay.DB
@@ -20,7 +20,7 @@ defmodule Hashpay.Payday do
           currency_id: String.t(),
           amount: non_neg_integer(),
           last_payday: non_neg_integer(),
-          last_stream: non_neg_integer(),
+          last_withdraw: non_neg_integer(),
           creation: non_neg_integer()
         }
 
@@ -30,7 +30,7 @@ defmodule Hashpay.Payday do
     :currency_id,
     :amount,
     :last_payday,
-    :last_stream,
+    :last_withdraw,
     creation: 0
   ]
 
@@ -56,7 +56,7 @@ defmodule Hashpay.Payday do
       currency_id text,
       amount bigint,
       last_payday bigint,
-      last_stream bigint,
+      last_withdraw bigint,
       creation bigint,
       PRIMARY KEY (id)
     );
@@ -86,7 +86,7 @@ defmodule Hashpay.Payday do
     currency_id = attrs[:currency_id]
     amount = attrs[:amount]
     last_payday = attrs[:last_payday]
-    last_stream = attrs[:last_stream]
+    last_withdraw = attrs[:last_withdraw]
 
     %__MODULE__{
       id: generate_id(account_id, currency_id),
@@ -94,14 +94,14 @@ defmodule Hashpay.Payday do
       currency_id: currency_id,
       amount: amount,
       last_payday: last_payday,
-      last_stream: last_stream,
+      last_withdraw: last_withdraw,
       creation: Hashpay.get_last_round_id()
     }
   end
 
   def prepare_statements!(conn) do
     insert_prepared = """
-    INSERT INTO paydays (id, account_id, currency_id, amount, last_payday, last_stream, creation)
+    INSERT INTO paydays (id, account_id, currency_id, amount, last_payday, last_withdraw, creation)
     VALUES (?, ?, ?, ?, ?, ?, ?);
     """
 
@@ -110,7 +110,7 @@ defmodule Hashpay.Payday do
     incr_prepared =
       Xandra.prepare!(
         conn,
-        "UPDATE paydays SET amount = amount + ?, last_stream = ? WHERE id = ?;"
+        "UPDATE paydays SET amount = amount + ?, last_withdraw = ? WHERE id = ?;"
       )
 
     insert_prepared = Xandra.prepare!(conn, insert_prepared)
@@ -141,7 +141,7 @@ defmodule Hashpay.Payday do
       {"text", payday.currency_id},
       {"bigint", payday.amount},
       {"bigint", payday.last_payday},
-      {"bigint", payday.last_stream},
+      {"bigint", payday.last_withdraw},
       {"bigint", payday.creation}
     ])
   end
@@ -210,7 +210,7 @@ defmodule Hashpay.Payday do
       currency_id: row["currency_id"],
       amount: row["amount"],
       last_payday: row["last_payday"],
-      last_stream: row["last_stream"],
+      last_withdraw: row["last_withdraw"],
       creation: row["creation"]
     })
   end

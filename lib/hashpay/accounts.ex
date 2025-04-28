@@ -74,26 +74,6 @@ defmodule Hashpay.Account do
     :ets.new(:accounts, [:set, :public, :named_table])
   end
 
-  def save(conn, %__MODULE__{} = account) do
-    params = [
-      {"text", account.id},
-      {"text", account.name},
-      {"blob", account.pubkey},
-      {"text", account.channel},
-      {"boolean", account.verified},
-      {"int", account.type_alg}
-    ]
-
-    case DB.execute(conn, insert_prepared(), params) do
-      {:ok, _} ->
-        Hits.hit_write(account.id, :account)
-        {:ok, account}
-
-      error ->
-        error
-    end
-  end
-
   def batch_save(batch, account) do
     Xandra.Batch.add(batch, insert_prepared(), [
       {"text", account.id},
@@ -145,6 +125,23 @@ defmodule Hashpay.Account do
     end)
     # Ejecuta el proceso sin acumular memoria innecesariamente
     |> Stream.run()
+  end
+
+  def count(conn) do
+    statement = "SELECT COUNT(*) FROM accounts;"
+    params = []
+
+    case DB.execute(conn, statement, params) do
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [row] -> {:ok, row["count"]}
+          [] -> {:error, :not_found}
+          _ -> {:error, :multiple_results}
+        end
+
+      error ->
+        error
+    end
   end
 
   def fetch(id) do

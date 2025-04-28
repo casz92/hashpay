@@ -247,8 +247,8 @@ defmodule Hashpay.Block do
       size int,
       status int,
       vsn int,
-      PRIMARY KEY ((channel), height)
-    ) WITH CLUSTERING ORDER BY (height DESC);
+      PRIMARY KEY (id)
+    ) WITH CLUSTERING ORDER BY (id DESC);
     """
 
     DB.execute(conn, statement)
@@ -257,6 +257,7 @@ defmodule Hashpay.Block do
     indices = [
       "CREATE INDEX IF NOT EXISTS ON blocks (hash);",
       "CREATE INDEX IF NOT EXISTS ON blocks (creator);",
+      "CREATE INDEX IF NOT EXISTS ON blocks (channel);",
       "CREATE INDEX IF NOT EXISTS ON blocks (round);"
     ]
 
@@ -280,13 +281,23 @@ defmodule Hashpay.Block do
     drop_table(conn)
   end
 
-  def save(conn, %__MODULE__{} = block) do
-    statement = """
+  def prepare_statements!(conn) do
+    insert_prepared = """
     INSERT INTO blocks (id, creator, channel, height, round, hash, filehash, prev, signature, timestamp, count, rejected, size, status, vsn)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    params = [
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+
+    :persistent_term.put({:stmt, "blocks_insert"}, insert_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "blocks_insert"})
+  end
+
+  def batch_save(batch, block) do
+    Xandra.Batch.add(batch, insert_prepared(), [
       {"bigint", block.id},
       {"text", block.creator},
       {"text", block.channel},
@@ -302,12 +313,7 @@ defmodule Hashpay.Block do
       {"int", block.size},
       {"int", block.status},
       {"int", block.vsn}
-    ]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, block}
-      error -> error
-    end
+    ])
   end
 
   def get(conn, channel, height) do
