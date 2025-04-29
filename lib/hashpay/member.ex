@@ -5,6 +5,7 @@ defmodule Hashpay.Member do
   Un miembro contiene:
   - group_id: Identificador del grupo al que pertenece el miembro
   - member_id: Identificador único del miembro
+  - role: Rol del miembro en el grupo
   - creation: Marca de tiempo de creación del miembro
   - meta: Metadatos adicionales del miembro
   """
@@ -13,12 +14,14 @@ defmodule Hashpay.Member do
 
   @enforce_keys [
     :group_id,
-    :member_id
+    :member_id,
+    :role
   ]
 
   defstruct [
     :group_id,
     :member_id,
+    :role,
     :creation,
     :meta
   ]
@@ -26,6 +29,7 @@ defmodule Hashpay.Member do
   @type t :: %__MODULE__{
           group_id: String.t(),
           member_id: String.t(),
+          role: String.t(),
           creation: non_neg_integer(),
           meta: map() | nil
         }
@@ -35,6 +39,7 @@ defmodule Hashpay.Member do
     CREATE TABLE IF NOT EXISTS members (
       group_id text,
       member_id text,
+      role text,
       creation bigint,
       meta MAP<text, text>,
       PRIMARY KEY (group_id, member_id)
@@ -57,10 +62,11 @@ defmodule Hashpay.Member do
     drop_table(conn)
   end
 
-  def new(group_id, member_id, meta \\ %{}) do
+  def new(group_id, member_id, role, meta \\ %{}) do
     %__MODULE__{
       group_id: group_id,
       member_id: member_id,
+      role: role,
       creation: Hashpay.get_last_round_id(),
       meta: meta
     }
@@ -68,8 +74,8 @@ defmodule Hashpay.Member do
 
   def prepare_statements!(conn) do
     insert_prepared = """
-    INSERT INTO members (group_id, member_id, creation, meta)
-    VALUES (?, ?, ?, ?);
+    INSERT INTO members (group_id, member_id, role, creation, meta)
+    VALUES (?, ?, ?, ?, ?);
     """
 
     delete_statement = "DELETE FROM members WHERE group_id = ? AND member_id = ?;"
@@ -93,6 +99,7 @@ defmodule Hashpay.Member do
     Xandra.Batch.add(batch, insert_prepared(), [
       {"text", member.group_id},
       {"text", member.member_id},
+      {"text", member.role},
       {"bigint", member.creation},
       {"map<text, text>", member.meta}
     ])
@@ -141,6 +148,7 @@ defmodule Hashpay.Member do
     struct!(__MODULE__, %{
       group_id: row["group_id"],
       member_id: row["member_id"],
+      role: row["role"],
       creation: row["creation"],
       meta: row["meta"]
     })
