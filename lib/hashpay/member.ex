@@ -29,7 +29,7 @@ defmodule Hashpay.Member do
   @type t :: %__MODULE__{
           group_id: String.t(),
           member_id: String.t(),
-          role: String.t(),
+          role: String.t() | nil,
           creation: non_neg_integer(),
           meta: map() | nil
         }
