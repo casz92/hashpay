@@ -27,14 +27,14 @@ defmodule Hashpay.Router do
 
   alias Hashpay.Command
 
-  post "/command" do
+  post "/v1/call" do
     {:ok, body, _conn} = read_body(conn)
     command = Command.decode(body)
 
     case Command.handle(command) do
       {:error, reason} ->
         Logger.error("Error handling command: #{reason}")
-        send_resp(conn, 400, %{"error" => reason} |> Jason.encode!())
+        send_resp(conn, 400, reason)
 
       _ ->
         send_resp(conn, 200, "OK")
@@ -42,7 +42,7 @@ defmodule Hashpay.Router do
   end
 
   # Ruta de estado para verificar que el servidor está funcionando
-  get "/status" do
+  get "/v1/status" do
     response = %{
       status: "ok",
       # s3: Application.get_env(:hashpay, :s3_endpoint),
@@ -56,24 +56,51 @@ defmodule Hashpay.Router do
   end
 
   # Ruta para WebSockets
-  get "/ws" do
+  get "/v1/ws" do
     conn = fetch_query_params(conn)
-    user_id = Map.get(conn.params, "user_id", "anonymous")
-    channel = Map.get(conn.params, "channel", "lobby")
+    sender = Map.get(conn.params, "sender")
+    channel = Map.get(conn.params, "channel")
+    challenge = Map.get(conn.params, "challenge")
+    signature = Map.get(conn.params, "signature") |> Base.decode16!()
+    db_conn = Hashpay.DB.get_conn()
 
-    Logger.info("WebSocket connection request from user: #{user_id} to channel: #{channel}")
+    # Verificar la firma del remitente
+    response =
+      case Command.fetch_sender(db_conn, sender) do
+        {:ok, sender} ->
+          case Cafezinho.Impl.verify(signature, challenge, sender.public_key) do
+            true -> :ok
+            false -> {:error, "Invalid signature"}
+          end
 
-    conn
-    |> WebSockAdapter.upgrade(
-      Hashpay.WebSocketHandler,
-      [user_id: user_id, channel: channel],
-      timeout: 120_000
-    )
-    |> halt()
+        {:error, :not_found} ->
+          {:error, "Sender not found"}
+
+        error ->
+          error
+      end
+
+    case response do
+      :ok ->
+        conn
+        |> WebSockAdapter.upgrade(
+          Hashpay.WebSocketClientHandler,
+          [sender: sender, channel: channel],
+          timeout: 120_000
+        )
+        |> halt()
+
+      {:error, reason} ->
+        Logger.error("Invalid signature for sender: #{sender}")
+
+        conn
+        |> send_resp(401, reason)
+        |> halt()
+    end
   end
 
   if Application.compile_env(:hashpay, :enable_cluster, true) do
-    get "/cluster/pubsub" do
+    get "/v1/cluster/pubsub" do
       conn = fetch_query_params(conn)
       name = Map.get(conn.params, "name")
       challenge = Map.get(conn.params, "challenge") |> Base.decode16!()
@@ -81,7 +108,7 @@ defmodule Hashpay.Router do
 
       with false <- is_nil(name),
            {:on, node} <- Hashpay.Cluster.get_and_authenticate(name, challenge, signature) do
-        Logger.info("WebSocket connection request from node: #{name}")
+        Logger.info("WebSocket connection request from node: #{node.name}")
 
         conn
         |> WebSockAdapter.upgrade(
@@ -107,6 +134,22 @@ defmodule Hashpay.Router do
       conn
       |> put_resp_content_type("text/html")
       |> send_file(200, "priv/html/websocket_example.html")
+    end
+
+    get "/ws" do
+      conn = fetch_query_params(conn)
+      user_id = Map.get(conn.params, "user_id", "anonymous")
+      channel = Map.get(conn.params, "channel", "lobby")
+
+      Logger.info("WebSocket connection request from user: #{user_id} to channel: #{channel}")
+
+      conn
+      |> WebSockAdapter.upgrade(
+        Hashpay.WebSocketHandlerExample,
+        [user_id: user_id, channel: channel],
+        timeout: 120_000
+      )
+      |> halt()
     end
   end
 

@@ -1,4 +1,4 @@
-defmodule Hashpay.WebSocketHandler do
+defmodule Hashpay.WebSocketHandlerExample do
   @moduledoc """
   Módulo para manejar conexiones WebSocket.
   Permite a los clientes conectarse a canales y comunicarse entre sí.

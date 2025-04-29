@@ -8,7 +8,9 @@ config :hashpay,
   https_port: 8443
 
 # No imprimir logs de depuración en producción
-config :logger, level: :info
+config :logger, :console,
+  level: :info,
+  compile_time_purge_level: :info
 
 # Configuración para ScyllaDB/Cassandra usando Xandra
 config :hashpay, :scylla,
