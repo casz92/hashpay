@@ -21,7 +21,7 @@ defmodule Hashpay.Function do
     :name,
     :mod,
     :fun,
-    :auth_type,
+    auth_type: 1,
     cost: 0,
     segment: 0
   ]

@@ -53,10 +53,12 @@ defmodule Hashpay.Validator do
     :updated
   ]
 
+  @impl true
   def up(conn) do
     create_table(conn)
   end
 
+  @impl true
   def down(conn) do
     drop_table(conn)
   end
@@ -82,6 +84,21 @@ defmodule Hashpay.Validator do
     """
 
     DB.execute(conn, statement)
+
+    indices = [
+      "CREATE INDEX IF NOT EXISTS ON validators (hostname);"
+    ]
+
+    Enum.each(indices, fn index ->
+      DB.execute!(conn, index)
+    end)
+  end
+
+  @impl true
+  def init(conn) do
+    create_ets_table()
+    load_all(conn)
+    prepare_statements!(conn)
   end
 
   def create_ets_table do

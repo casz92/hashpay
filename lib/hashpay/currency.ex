@@ -56,10 +56,12 @@ defmodule Hashpay.Currency do
     :updated
   ]
 
+  @impl true
   def up(conn) do
     create_table(conn)
   end
 
+  @impl true
   def down(conn) do
     drop_table(conn)
   end
@@ -82,11 +84,26 @@ defmodule Hashpay.Currency do
     """
 
     DB.execute(conn, statement)
+
+    indices = [
+      "CREATE INDEX IF NOT EXISTS ON currencies (name);"
+    ]
+
+    Enum.each(indices, fn index ->
+      DB.execute!(conn, index)
+    end)
   end
 
   def drop_table(conn) do
     statement = "DROP TABLE IF EXISTS currencies;"
     DB.execute(conn, statement)
+  end
+
+  @impl true
+  def init(conn) do
+    create_ets_table()
+    load_all(conn)
+    prepare_statements!(conn)
   end
 
   def create_ets_table do

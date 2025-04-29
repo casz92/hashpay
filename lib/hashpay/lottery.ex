@@ -1,4 +1,4 @@
-defmodule Lottery do
+defmodule Hashpay.Lottery do
   @moduledoc """
   Estructura y funciones para las loterías de la blockchain de Hashpay.
   Una lotería contiene:
@@ -64,6 +64,11 @@ defmodule Lottery do
   @impl true
   def down(conn) do
     drop_table(conn)
+  end
+
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
   end
 
   def prepare_statements!(conn) do

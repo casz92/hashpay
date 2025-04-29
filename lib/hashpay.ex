@@ -8,14 +8,13 @@ defmodule Hashpay do
           :account
           | :block
           | :round
-          | :merchant
           | :currency
           | :balance
           | :validator
+          | :merchant
           | :member
-          | :balance
-          | :holding
           | :plan
+          | :holding
           | :payday
           | :lottery
           | :lottery_ticket

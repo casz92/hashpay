@@ -44,10 +44,12 @@ defmodule Hashpay.Account do
     }
   end
 
+  @impl true
   def up(conn) do
     create_table(conn)
   end
 
+  @impl true
   def down(conn) do
     drop_table(conn)
   end
@@ -56,7 +58,7 @@ defmodule Hashpay.Account do
     statement = """
     CREATE TABLE IF NOT EXISTS accounts (
       id text,
-      name text UNIQUE,
+      name text,
       pubkey blob,
       channel text,
       verified boolean,
@@ -65,12 +67,26 @@ defmodule Hashpay.Account do
     );
     """
 
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
+
+    indices = [
+      "CREATE INDEX IF NOT EXISTS ON accounts (name);",
+    ]
+
+    Enum.each(indices, fn index ->
+      DB.execute!(conn, index)
+    end)
   end
 
   def drop_table(conn) do
     statement = "DROP TABLE IF EXISTS accounts;"
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
+  end
+
+  @impl true
+  def init(conn) do
+    create_ets_table()
+    prepare_statements!(conn)
   end
 
   def create_ets_table do
@@ -150,7 +166,7 @@ defmodule Hashpay.Account do
   def fetch(id) do
     case :ets.lookup(:accounts, id) do
       [{^id, account}] ->
-        Hits.hit_read(account.id, :account)
+        Hits.hit(account.id, :account)
         {:ok, account}
 
       [] ->
@@ -160,8 +176,18 @@ defmodule Hashpay.Account do
 
   def fetch(conn, id) do
     case fetch(id) do
-      {:ok, account} -> {:ok, account}
-      {:error, :not_found} -> get(conn, id)
+      {:ok, account} ->
+        {:ok, account}
+
+      {:error, :not_found} ->
+        case get(conn, id) do
+          {:ok, account} ->
+            put(account)
+            {:ok, account}
+
+          error ->
+            error
+        end
     end
   end
 
@@ -246,9 +272,14 @@ defmodule Hashpay.Account do
     case DB.execute(conn, statement, params) do
       {:ok, %Xandra.Page{} = page} ->
         case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
+          [row] ->
+            {:ok, row_to_struct(row)}
+
+          [] ->
+            {:error, :not_found}
+
+          _ ->
+            {:error, :multiple_results}
         end
 
       error ->
@@ -278,6 +309,7 @@ defmodule Hashpay.Account do
 
   def put(%__MODULE__{} = account) do
     :ets.insert(:accounts, {account.id, account})
+    Hits.hit(account.id, :account)
   end
 
   def remove(id) do

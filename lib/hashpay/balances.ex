@@ -57,12 +57,19 @@ defmodule Hashpay.Balance do
     DB.execute(conn, statement)
   end
 
+  @impl true
+  def init(conn) do
+    create_ets_table()
+    prepare_statements!(conn)
+  end
+
   def create_ets_table do
     :ets.new(:balances, [:set, :public, :named_table])
   end
 
   def put(tuple, amount) do
     :ets.insert(:balances, {tuple, amount})
+    Hits.hit(tuple, :balance)
   end
 
   @spec fetch(tuple()) :: {:ok, t()} | {:error, :not_found | :deleted}
@@ -72,7 +79,7 @@ defmodule Hashpay.Balance do
         {:error, :deleted}
 
       [{^tuple, balance}] ->
-        Hits.hit_read(id, :balance)
+        put(tuple, balance)
         {:ok, balance}
 
       [] ->
@@ -82,9 +89,15 @@ defmodule Hashpay.Balance do
 
   def fetch(conn, tuple) do
     case fetch(tuple) do
-      {:ok, balance} -> {:ok, balance}
-      {:error, :not_found} -> get(conn, tuple)
-      error -> error
+      {:ok, balance} ->
+        Hits.hit(tuple, :balance)
+        {:ok, balance}
+
+      {:error, :not_found} ->
+        get(conn, tuple)
+
+      error ->
+        error
     end
   end
 
@@ -173,7 +186,7 @@ defmodule Hashpay.Balance do
   @spec incr(tuple(), integer()) :: integer()
   def incr(tuple, amount) do
     result = :ets.update_counter(:balances, tuple, {2, amount}, {tuple, 0 + amount})
-    Hits.hit_write(tuple, :balance)
+    Hits.hit(tuple, :balance)
     result
   end
 

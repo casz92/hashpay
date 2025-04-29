@@ -46,6 +46,11 @@ defmodule Hashpay.Paystream do
     drop_table(conn)
   end
 
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
+  end
+
   def create_table(conn) do
     statement = """
     CREATE TABLE IF NOT EXISTS paystreams (
@@ -105,14 +110,12 @@ defmodule Hashpay.Paystream do
 
     delete_statement = "DELETE FROM paystreams WHERE id = ?;"
 
+    incr_statement =
+      "UPDATE paystreams SET amount = ?, last_paystream = ? WHERE id = ?;"
+
     insert_prepared = Xandra.prepare!(conn, insert_prepared)
     delete_prepared = Xandra.prepare!(conn, delete_statement)
-
-    incr_prepared =
-      Xandra.prepare!(
-        conn,
-        "UPDATE paystreams SET amount = amount + ?, last_paystream = ? WHERE id = ?;"
-      )
+    incr_prepared = Xandra.prepare!(conn, incr_statement)
 
     :persistent_term.put({:stmt, "paystreams_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "paystreams_delete"}, delete_prepared)

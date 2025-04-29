@@ -41,7 +41,7 @@ if config_env() == :prod do
 
   config :hashpay, :scylla,
     nodes: scylla_nodes,
-    keyspace: System.get_env("SCYLLA_KEYSPACE", "hashpay_prod"),
+    keyspace: System.get_env("SCYLLA_KEYSPACE", "hashpay"),
     authentication: scylla_auth
 
   # Configuración de HMAC para producción

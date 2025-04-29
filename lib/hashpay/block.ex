@@ -248,10 +248,10 @@ defmodule Hashpay.Block do
       status int,
       vsn int,
       PRIMARY KEY (id)
-    ) WITH CLUSTERING ORDER BY (id DESC);
+    );
     """
 
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
 
     # Crear índices para búsquedas eficientes
     indices = [
@@ -262,21 +262,28 @@ defmodule Hashpay.Block do
     ]
 
     Enum.each(indices, fn index ->
-      DB.execute(conn, index)
+      DB.execute!(conn, index)
     end)
   end
 
+  @impl true
   def up(conn) do
     create_table(conn)
   end
 
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS blocks;"
-    DB.execute(conn, statement)
-  end
-
+  @impl true
   def down(conn) do
     drop_table(conn)
+  end
+
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
+  end
+
+  def drop_table(conn) do
+    statement = "DROP TABLE IF EXISTS blocks;"
+    DB.execute!(conn, statement)
   end
 
   def prepare_statements!(conn) do

@@ -19,11 +19,19 @@ defmodule Hashpay.ClusterNode do
 
   alias Hashpay.DB
 
+  def up(conn) do
+    create_table(conn)
+  end
+
+  def down(conn) do
+    drop_table(conn)
+  end
+
   def create_table(conn) do
     statement = """
-    CREATE TABLE IF NOT EXISTS cluster_nodes (
+    CREATE TABLE IF NOT EXISTS cluster (
       id UUID,
-      name text UNIQUE,
+      name text,
       ip text,
       active boolean,
       pubkey blob,
@@ -32,7 +40,12 @@ defmodule Hashpay.ClusterNode do
     );
     """
 
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
+  end
+
+  def drop_table(conn) do
+    statement = "DROP TABLE IF EXISTS cluster;"
+    DB.execute!(conn, statement)
   end
 
   def new(name, ip, pubkey, role) do

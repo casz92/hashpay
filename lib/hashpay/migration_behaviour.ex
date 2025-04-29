@@ -9,4 +9,5 @@ defmodule Hashpay.MigrationBehaviour do
 
   @callback up(conn :: pid()) :: no_return()
   @callback down(conn :: pid()) :: no_return()
+  @callback init(conn :: pid()) :: no_return()
 end

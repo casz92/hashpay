@@ -54,12 +54,19 @@ defmodule Hashpay.Member do
     DB.execute(conn, statement)
   end
 
+  @impl true
   def up(conn) do
     create_table(conn)
   end
 
+  @impl true
   def down(conn) do
     drop_table(conn)
+  end
+
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
   end
 
   def new(group_id, member_id, role, meta \\ %{}) do

@@ -3,7 +3,7 @@ defmodule Hashpay.Functions do
 
   @doc """
   Lista de funciones disponibles en la blockchain de Hashpay.
-  Order commands: account, balance/coins, currency, validator, merchant, member, holding, payday, paystream, plan, lottery
+  Order commands: variable, account, balance/coins, currency, validator, merchant, member, holding, payday, paystream, plan, lottery
   """
   @functions [
     %Function{
@@ -53,280 +53,294 @@ defmodule Hashpay.Functions do
       name: "createCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 101,
       name: "changeNameCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :change_name,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 102,
       name: "changePubkeyCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :change_pubkey,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 103,
       name: "updateCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 104,
       name: "deleteCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :delete,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 200,
       name: "mintCoins",
       mod: Hashpay.Balance.Commands,
       fun: :mint,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 201,
       name: "transferCoins",
       mod: Hashpay.Balance.Commands,
       fun: :transfer,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 202,
       name: "freezeCoins",
       mod: Hashpay.Balance.Commands,
       fun: :freeze,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 203,
       name: "unfreezeCoins",
       mod: Hashpay.Balance.Commands,
       fun: :unfreeze,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 204,
       name: "burnCoins",
       mod: Hashpay.Balance.Commands,
       fun: :burn,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 300,
       name: "createValidator",
       mod: Hashpay.Validator.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 301,
       name: "changeNameValidator",
       mod: Hashpay.Validator.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 302,
       name: "changePubkeyValidator",
       mod: Hashpay.Validator.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 303,
       name: "changeChannelValidator",
       mod: Hashpay.Validator.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 304,
       name: "updateValidator",
       mod: Hashpay.Validator.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 305,
       name: "putPropsValidator",
       mod: Hashpay.Validator.Commands,
       fun: :put_props,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 306,
       name: "deletePropsValidator",
       mod: Hashpay.Validator.Commands,
       fun: :delete_props,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 307,
       name: "deleteValidator",
       mod: Hashpay.Validator.Commands,
       fun: :delete,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 400,
       name: "createMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 401,
       name: "changeNameMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 402,
       name: "changePubkeyMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 403,
       name: "changeChannelMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 404,
       name: "updateMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 405,
       name: "putPropsMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :put_props,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 406,
       name: "deletePropsMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :delete_props,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 407,
       name: "deleteMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :delete,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 500,
       name: "addMember",
       mod: Hashpay.Member.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 501,
       name: "removeMember",
       mod: Hashpay.Member.Commands,
       fun: :delete,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 600,
       name: "startHolding",
       mod: Hashpay.Holding.Commands,
       fun: :start_holding,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 601,
       name: "endHolding",
       mod: Hashpay.Holding.Commands,
       fun: :end_holding,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 700,
       name: "createPlan",
       mod: Hashpay.Plan.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 701,
       name: "updatePlan",
       mod: Hashpay.Plan.Commands,
       fun: :update,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 702,
       name: "deletePlan",
       mod: Hashpay.Plan.Commands,
       fun: :delete,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 800,
       name: "createPayday",
       mod: Hashpay.Payday.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 801,
       name: "withdrawPayday",
       mod: Hashpay.Payday.Commands,
       fun: :withdraw,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 900,
       name: "createPaystream",
       mod: Hashpay.Paystream.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 901,
       name: "withdrawPaystream",
       mod: Hashpay.Paystream.Commands,
       fun: :withdraw,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 1000,
       name: "createLottery",
       mod: Hashpay.Lottery.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 1001,
       name: "buyLotteryTicket",
       mod: Hashpay.Lottery.Commands,
       fun: :buy_ticket,
-      auth_type: 0
+      auth_type: 1
     },
     %Function{
       id: 1002,
       name: "claimLottery",
       mod: Hashpay.Lottery.Commands,
       fun: :claim,
-      auth_type: 0
+      auth_type: 1
+    },
+    %Function{
+      id: 1100,
+      name: "setVariable",
+      mod: Hashpay.Variable.Commands,
+      fun: :set,
+      auth_type: 1
+    },
+    %Function{
+      id: 1100,
+      name: "deleteVariable",
+      mod: Hashpay.Variable.Commands,
+      fun: :delete,
+      auth_type: 1
     }
   ]
 

@@ -50,7 +50,8 @@ defmodule Hashpay.MixProject do
         :bandit,
         :plug,
         :websock,
-        :websock_adapter
+        :websock_adapter,
+        :telemetry
       ]
     ]
   end
@@ -101,6 +102,9 @@ defmodule Hashpay.MixProject do
 
       # Phoenix PubSub - Sistema de publicación/suscripción
       {:phoenix_pubsub, "~> 2.1"},
+
+      # Telemetry - Medición y monitoreo
+      {:telemetry, "~> 1.0"},
 
       # ExAws - Cliente para AWS
       {:ex_aws, "~> 2.5"},

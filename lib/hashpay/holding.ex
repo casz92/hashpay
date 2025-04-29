@@ -42,6 +42,11 @@ defmodule Hashpay.Holding do
     drop_table(conn)
   end
 
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
+  end
+
   def create_table(conn) do
     statement = """
     CREATE TABLE IF NOT EXISTS holdings (

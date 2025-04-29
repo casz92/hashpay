@@ -235,8 +235,14 @@ defmodule Hashpay.Round do
 
   # Sobrescribir funciones específicas del behaviour Storable
 
+  @impl true
   def up(conn) do
     create_table(conn)
+  end
+
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
   end
 
   def create_table(conn) do
@@ -256,28 +262,28 @@ defmodule Hashpay.Round do
       blocks frozen<list<blob>>,
       vsn int,
       PRIMARY KEY (id)
-    ) with clustering order by (id DESC);
+    );
     """
 
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
 
     # Crear índices para búsquedas eficientes
     indices = [
       "CREATE INDEX IF NOT EXISTS ON rounds (hash);",
-      "CREATE INDEX IF NOT EXISTS ON rounds (creator);",
-      "CREATE INDEX IF NOT EXISTS ON rounds (status);"
+      "CREATE INDEX IF NOT EXISTS ON rounds (creator);"
     ]
 
     Enum.each(indices, fn index ->
-      DB.execute(conn, index)
+      DB.execute!(conn, index)
     end)
   end
 
   def drop_table(conn) do
     statement = "DROP TABLE IF EXISTS rounds;"
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
   end
 
+  @impl true
   def down(conn) do
     drop_table(conn)
   end

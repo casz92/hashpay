@@ -83,13 +83,19 @@ defmodule Hashpay.Variable do
 
   def batch_save(batch, variable) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", variable.key},
-      {"blob", variable.value |> :erlang.term_to_binary()}
+      variable.key,
+      variable.value |> :erlang.term_to_binary()
     ])
   end
 
   def batch_delete(batch, key) do
     Xandra.Batch.add(batch, delete_prepared(), [{"text", key}])
+  end
+
+  @impl true
+  def init(conn) do
+    load_all(conn)
+    prepare_statements!(conn)
   end
 
   def load_all(conn) do
@@ -108,16 +114,23 @@ defmodule Hashpay.Variable do
     end
   end
 
+  @impl true
   def up(conn) do
     create_table(conn)
+    prepare_statements!(conn)
 
-    Xandra.Batch.new()
-    |> batch_save(%Variable{key: "round_rewarded_base", value: 10})
-    |> batch_save(%Variable{key: "round_rewarded_transactions", value: 0.1})
-    |> batch_save(%Variable{key: "round_size_target", value: 0.05})
-    |> Xandra.execute(conn)
+    batch =
+      Xandra.Batch.new(:logged)
+      |> batch_save(%Variable{key: "factor_a", value: 1})
+      |> batch_save(%Variable{key: "factor_b", value: 0})
+      |> batch_save(%Variable{key: "round_rewarded_base", value: 10})
+      |> batch_save(%Variable{key: "round_rewarded_transactions", value: 0.1})
+      |> batch_save(%Variable{key: "round_size_target", value: 0.05})
+
+    Xandra.execute(conn, batch)
   end
 
+  @impl true
   def down(conn) do
     drop_table(conn)
   end

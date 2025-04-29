@@ -7,13 +7,15 @@ defmodule Hashpay.Hits do
   - id: Identificador único del objeto
   - type: Tipo de objeto (Hashpay.object_type())
   - readed_at: Timestamp de la última lectura
-  - written_at: Timestamp de la última escritura
   """
+  alias Hashpay.Balance
+  alias Hashpay.Merchant
+  alias Hashpay.Account
   require Logger
   @module_name Module.split(__MODULE__) |> Enum.join(".")
   @table_name :hits
   @unit_time :millisecond
-  @cleanup_interval :timer.minutes(10)
+  @cleanup_interval :timer.minutes(15)
   @expiration_time :timer.hours(1)
 
   def child_spec(opts) do
@@ -50,41 +52,17 @@ defmodule Hashpay.Hits do
     {:ok, args}
   end
 
-  @spec hit_read(binary(), Hashpay.object_type()) :: boolean()
-  def hit_read(id, type) do
+  @spec hit(binary(), Hashpay.object_type()) :: boolean()
+  def hit(id, type) do
     timestamp = now()
-
-    case :ets.lookup(@table_name, id) do
-      [] ->
-        # Nuevo registro: {id, readed_at, written_at}
-        :ets.insert(@table_name, {id, type, timestamp, nil})
-
-      [{^id, _old_read_at, _old_write_at}] ->
-        # Actualizar registro existente
-        :ets.update_element(@table_name, id, {2, timestamp})
-    end
-  end
-
-  @spec hit_write(binary(), Hashpay.object_type()) :: boolean()
-  def hit_write(id, type) do
-    timestamp = now()
-
-    case :ets.lookup(@table_name, id) do
-      [] ->
-        :ets.insert(@table_name, {id, type, nil, timestamp})
-
-      [{^id, _old_read_at, _old_write_at}] ->
-        # Actualizar registro existente
-        :ets.update_element(@table_name, id, {3, timestamp})
-    end
+    :ets.insert(@table_name, {id, type, timestamp})
   end
 
   @spec retrive_by_type(Hashpay.object_type()) :: [binary() | String.t()]
   def retrive_by_type(type) do
+    # :ets.fun2ms(fn {id, 1, _readed_at} -> id end)
     match_spec =
-      :ets.fun2ms(fn {id, ^type, _readed_at, _written_at} ->
-        id
-      end)
+      [{{:"$1", type, :"$2"}, [], [:"$1"]}]
 
     :ets.select(@table_name, match_spec)
   end
@@ -94,13 +72,31 @@ defmodule Hashpay.Hits do
     :ets.delete(@table_name, id)
   end
 
+  @doc """
+  Elimina los registros menos recientes de la tabla ETS.
+  """
+  @spec cleanup(older_than :: integer()) :: count :: integer()
   def cleanup(older_than) do
-    match_spec =
-      :ets.fun2ms(fn {_id, readed_at, _written_at} ->
-        readed_at != nil or readed_at < older_than
-      end)
+    :ets.foldl(
+      fn {id, type, readed_at}, acc ->
+        Logger.info("Removing #{inspect(id)} of type #{inspect(type)} at #{inspect(readed_at)}")
 
-    :ets.select_delete(@table_name, match_spec)
+        if readed_at < older_than do
+          case type do
+            :account -> Account.remove(id)
+            :merchant -> Merchant.remove(id)
+            :balance -> Balance.remove(id)
+            _ -> remove(id)
+          end
+
+          acc + 1
+        else
+          acc
+        end
+      end,
+      0,
+      @table_name
+    )
   end
 
   defp now do
@@ -111,6 +107,6 @@ defmodule Hashpay.Hits do
   def handle_info(:cleanup, state) do
     cleanup(now() - @expiration_time)
     Process.send_after(self(), :cleanup, @cleanup_interval)
-    {:ok, state}
+    {:noreply, state}
   end
 end

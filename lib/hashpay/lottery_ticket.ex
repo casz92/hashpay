@@ -41,6 +41,11 @@ defmodule Hashpay.LotteryTicket do
     drop_table(conn)
   end
 
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
+  end
+
   def create_table(conn) do
     statement = """
     CREATE TABLE IF NOT EXISTS lottery_tickets (
@@ -91,21 +96,29 @@ defmodule Hashpay.LotteryTicket do
     }
   end
 
-  def insert(conn, %__MODULE__{} = ticket) do
-    statement = """
+  def prepare_statements!(conn) do
+    insert_prepared = """
     INSERT INTO lottery_tickets (id, lottery_id, account_id, number, creation)
     VALUES (?, ?, ?, ?, ?);
     """
 
-    params = [
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+
+    :persistent_term.put({:stmt, "lottery_tickets_insert"}, insert_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "lottery_tickets_insert"})
+  end
+
+  def batch_save(batch, ticket) do
+    Xandra.Batch.add(batch, insert_prepared(), [
       {"text", ticket.id},
       {"text", ticket.lottery_id},
       {"text", ticket.account_id},
       {"text", ticket.number},
       {"bigint", ticket.creation}
-    ]
-
-    DB.execute(conn, statement, params)
+    ])
   end
 
   def get(conn, id) do

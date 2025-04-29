@@ -2,6 +2,22 @@ defmodule Hashpay.Application do
   @moduledoc """
   Módulo de aplicación para Hashpay.
   """
+  alias Hashpay.Block
+  alias Hashpay.Round
+  alias Hashpay.Member
+  alias Hashpay.Plan
+  alias Hashpay.Balance
+  alias Hashpay.Payday
+  alias Hashpay.Paystream
+  alias Hashpay.Holding
+  alias Hashpay.LotteryTicket
+  alias Hashpay.Merchant
+  alias Hashpay.Account
+  alias Hashpay.DB
+  alias Hashpay.Validator
+  alias Hashpay.Variable
+  alias Hashpay.Currency
+  alias Hashpay.Lottery
   use Application
   require Logger
 
@@ -51,6 +67,8 @@ defmodule Hashpay.Application do
 
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
+        conn = DB.get_conn()
+        load_objects(conn)
         Logger.info("Hashpay v#{version} started ✨")
         {:ok, pid}
 
@@ -58,6 +76,24 @@ defmodule Hashpay.Application do
         Logger.error("Failed to start Hashpay 💥: #{inspect(reason)}")
         {:error, reason}
     end
+  end
+
+  defp load_objects(conn) do
+    Round.init(conn)
+    Block.init(conn)
+    Variable.init(conn)
+    Currency.init(conn)
+    Validator.init(conn)
+    Account.init(conn)
+    Merchant.init(conn)
+    Balance.init(conn)
+    Member.init(conn)
+    Plan.init(conn)
+    Payday.init(conn)
+    Paystream.init(conn)
+    Holding.init(conn)
+    Lottery.init(conn)
+    LotteryTicket.init(conn)
   end
 
   # Función auxiliar para obtener configuración del entorno

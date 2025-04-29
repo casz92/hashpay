@@ -12,6 +12,7 @@ defmodule Hashpay.Merchant do
   - creation: Marca de tiempo de creación del comercio
   - updated: Marca de tiempo de última actualización del comercio
   """
+  alias Hashpay.Hits
   alias Hashpay.DB
   @behaviour Hashpay.MigrationBehaviour
 
@@ -54,7 +55,7 @@ defmodule Hashpay.Merchant do
     statement = """
     CREATE TABLE IF NOT EXISTS merchants (
       id text,
-      name text UNIQUE,
+      name text,
       channel text,
       pubkey blob,
       picture text,
@@ -65,12 +66,26 @@ defmodule Hashpay.Merchant do
     );
     """
 
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
+
+    indices = [
+      "CREATE INDEX IF NOT EXISTS ON merchants (name);"
+    ]
+
+    Enum.each(indices, fn index ->
+      DB.execute!(conn, index)
+    end)
   end
 
   def drop_table(conn) do
     statement = "DROP TABLE IF EXISTS merchants;"
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
+  end
+
+  @impl true
+  def init(conn) do
+    create_ets_table()
+    prepare_statements!(conn)
   end
 
   def create_ets_table do
@@ -173,6 +188,11 @@ defmodule Hashpay.Merchant do
     Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
   end
 
+  def remove(id) do
+    :ets.delete(:merchants, id)
+    Hits.remove(id)
+  end
+
   def delete(conn, id) do
     statement = "DELETE FROM merchants WHERE id = ?;"
     params = [{"text", id}]
@@ -233,15 +253,29 @@ defmodule Hashpay.Merchant do
 
   def fetch(id) do
     case :ets.lookup(:merchants, id) do
-      [{^id, merchant}] -> {:ok, merchant}
-      [] -> {:error, :not_found}
+      [{^id, merchant}] ->
+        Hits.hit(id, :merchants)
+        {:ok, merchant}
+
+      [] ->
+        {:error, :not_found}
     end
   end
 
   def fetch(conn, id) do
     case fetch(id) do
-      {:ok, merchant} -> {:ok, merchant}
-      {:error, :not_found} -> get(conn, id)
+      {:ok, merchant} ->
+        {:ok, merchant}
+
+      {:error, :not_found} ->
+        case get(conn, id) do
+          {:ok, merchant} ->
+            put(merchant)
+            {:ok, merchant}
+
+          error ->
+            error
+        end
     end
   end
 
@@ -253,6 +287,11 @@ defmodule Hashpay.Merchant do
       {:error, :not_found} ->
         get(conn, id, channel)
     end
+  end
+
+  def put(%__MODULE__{} = merchant) do
+    :ets.insert(:merchants, {merchant.id, merchant})
+    Hits.hit(merchant.id, :merchants)
   end
 
   def row_to_struct(row) do

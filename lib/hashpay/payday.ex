@@ -46,6 +46,11 @@ defmodule Hashpay.Payday do
     drop_table(conn)
   end
 
+  @impl true
+  def init(conn) do
+    prepare_statements!(conn)
+  end
+
   def create_table(conn) do
     statement = """
     CREATE TABLE IF NOT EXISTS paydays (
@@ -105,15 +110,12 @@ defmodule Hashpay.Payday do
 
     delete_statement = "DELETE FROM paydays WHERE id = ?;"
 
-    incr_prepared =
-      Xandra.prepare!(
-        conn,
-        "UPDATE paydays SET amount = amount + ?, last_withdraw = ? WHERE id = ?;"
-      )
+    incr_statement =
+      "UPDATE paydays SET amount = ?, last_withdraw = ? WHERE id = ?;"
 
     insert_prepared = Xandra.prepare!(conn, insert_prepared)
     delete_prepared = Xandra.prepare!(conn, delete_statement)
-    incr_prepared = Xandra.prepare!(conn, incr_prepared)
+    incr_prepared = Xandra.prepare!(conn, incr_statement)
 
     :persistent_term.put({:stmt, "paydays_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "paydays_delete"}, delete_prepared)
