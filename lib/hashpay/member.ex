@@ -126,6 +126,24 @@ defmodule Hashpay.Member do
     end
   end
 
+  def exists?(conn, group_id, member_id, role) do
+    statement =
+      "SELECT member_id FROM members WHERE group_id = ? AND member_id = ? AND role = ? LIMIT 1"
+
+    params = [{"text", group_id}, {"text", member_id}, {"text", role}]
+
+    case DB.execute(conn, statement, params) do
+      {:ok, %Xandra.Page{} = page} ->
+        case Enum.to_list(page) do
+          [] -> false
+          _ -> true
+        end
+
+      error ->
+        error
+    end
+  end
+
   def get(conn, group_id, member_id) do
     statement = "SELECT * FROM members WHERE group_id = ? AND member_id = ?;"
     params = [{"text", group_id}, {"text", member_id}]
