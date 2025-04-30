@@ -13,7 +13,7 @@ defmodule Hashpay.DB do
 
     case Xandra.start_link(opts) do
       {:ok, pid} ->
-        Logger.info("Running #{@module_name} with Xandra v#{version} ✅")
+        Logger.debug("Running #{@module_name} with Xandra v#{version} ✅")
         :persistent_term.put(@connection_key, pid)
         {:ok, pid}
 

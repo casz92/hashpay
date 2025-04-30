@@ -30,11 +30,10 @@ defmodule Hashpay.Application do
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
     threads = get_env(:threads, 2)
-
     db_opts = get_env(:scylla, nil)
 
-    # Inicializar la conexión a ScyllaDB
-    # init_scylla_connection()
+    # Inicializar estado
+    init_state()
 
     # Configuración para HTTP
     children = [
@@ -46,7 +45,7 @@ defmodule Hashpay.Application do
       # Conexión a ScyllaDB
       {Hashpay.DB, db_opts},
       # Servidor HTTP
-      {Bandit, plug: Hashpay.Router, port: http_port, startup_log: :info},
+      {Bandit, plug: Hashpay.Router, port: http_port, startup_log: :debug},
 
       # Servidor HTTPS
       {Bandit,
@@ -56,12 +55,12 @@ defmodule Hashpay.Application do
        keyfile: cert_path("key.pem"),
        certfile: cert_path("cert.pem"),
        cipher_suite: :strong,
-       startup_log: :info,
+       startup_log: :debug,
        otp_app: :hashpay}
     ]
 
     # Mostrar información de inicio
-    Logger.info("Starting Hashpay v#{version} ⌛")
+    Logger.debug("Starting Hashpay v#{version} ⌛")
 
     # Ver https://hexdocs.pm/elixir/Supervisor.html
     # para otras estrategias y opciones
@@ -71,13 +70,18 @@ defmodule Hashpay.Application do
       {:ok, pid} ->
         conn = DB.get_conn()
         load_objects(conn)
-        Logger.info("Hashpay v#{version} started ✨")
+        Logger.info("Hashpay v#{version} started with #{threads} threads ✨")
         {:ok, pid}
 
       {:error, reason} ->
         Logger.error("Failed to start Hashpay 💥: #{inspect(reason)}")
         {:error, reason}
     end
+  end
+
+  defp init_state do
+    ref = :counters.new(1, [:write_concurrency])
+    :persistent_term.put(:thread_counter, ref)
   end
 
   defp load_objects(conn) do

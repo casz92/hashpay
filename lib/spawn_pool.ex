@@ -34,7 +34,6 @@ defmodule SpawnPool do
           DynamicSupervisor.start_child(sup, {worker_module, {name, i}})
         end
 
-        Logger.info("Pool started with #{pool_size} workers ✅")
         {:ok, sup}
 
       {:error, reason} ->

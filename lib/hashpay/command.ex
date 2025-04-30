@@ -100,6 +100,17 @@ defmodule Hashpay.Command do
   @threads Application.compile_env(:hashpay, :threads)
 
   @spec thread(Hashpay.Function.t(), t()) :: non_neg_integer()
+  def thread(%{thread: :roundrobin}, _cmd) do
+    ref = :persistent_term.get(:thread_counter, nil)
+    number = :counters.add(ref, 0, 1)
+
+    if number > @threads do
+      :counters.put(ref, 0, 0)
+    end
+
+    number
+  end
+
   def thread(fun, cmd) do
     result =
       case fun.thread do

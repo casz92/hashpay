@@ -23,7 +23,7 @@ defmodule Hashpay.Function do
     :fun,
     auth_type: 1,
     cost: 1,
-    thread: :sender
+    thread: :roundrobin
   ]
 
   @type t :: %__MODULE__{

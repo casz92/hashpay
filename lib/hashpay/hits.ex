@@ -37,7 +37,7 @@ defmodule Hashpay.Hits do
 
     case GenServer.start_link(__MODULE__, [], name: __MODULE__) do
       {:ok, pid} ->
-        Logger.info("Running #{@module_name} ✅")
+        Logger.debug("Running #{@module_name} ✅")
         {:ok, pid}
 
       {:error, reason} ->
