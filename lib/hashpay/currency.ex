@@ -56,6 +56,8 @@ defmodule Hashpay.Currency do
     :updated
   ]
 
+  @prefix "cu_"
+
   @impl true
   def up(conn) do
     create_table(conn)
@@ -125,7 +127,7 @@ defmodule Hashpay.Currency do
   end
 
   def generate_id(id) do
-    ["cu_", id] |> IO.iodata_to_binary()
+    [@prefix, id] |> IO.iodata_to_binary()
   end
 
   def new(attrs) do
@@ -168,21 +170,21 @@ defmodule Hashpay.Currency do
 
   def batch_save(batch, currency) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", currency.id},
-      {"text", currency.name},
-      {"blob", currency.pubkey},
-      {"text", currency.picture},
-      {"int", currency.decimal},
-      {"text", currency.symbol},
-      {"bigint", currency.max_supply},
-      {"list<text>", currency.props},
-      {"bigint", currency.creation},
-      {"bigint", currency.updated}
+      currency.id,
+      currency.name,
+      currency.pubkey,
+      currency.picture,
+      currency.decimal,
+      currency.symbol,
+      currency.max_supply,
+      currency.props,
+      currency.creation,
+      currency.updated
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def batch_update_fields(batch, map, id) do
@@ -217,49 +219,6 @@ defmodule Hashpay.Currency do
     end
   end
 
-  def update(conn, %__MODULE__{} = currency) do
-    statement = """
-    UPDATE currencies
-    SET name = ?, pubkey = ?, picture = ?, decimal = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
-    WHERE id = ?;
-    """
-
-    params = [
-      {"text", currency.name},
-      {"blob", currency.pubkey},
-      {"text", currency.picture},
-      {"int", currency.decimal},
-      {"text", currency.symbol},
-      {"bigint", currency.max_supply},
-      {"list<text>", currency.props},
-      {"bigint", currency.updated},
-      {"text", currency.id}
-    ]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, currency}
-      error -> error
-    end
-  end
-
-  def update_fields(conn, map, id) do
-    set_clause =
-      Enum.map_join(map, ", ", fn {field, value} ->
-        "#{field} = :#{value}"
-      end)
-
-    statement = """
-    UPDATE currencies
-    SET #{set_clause}
-    WHERE id = :id;
-    """
-
-    case DB.execute(conn, statement, Map.put(map, :id, id)) do
-      {:ok, _} -> :ok
-      error -> error
-    end
-  end
-
   def batch_sync(conn) do
     batch = Xandra.Batch.new()
 
@@ -280,19 +239,19 @@ defmodule Hashpay.Currency do
     |> Stream.map(fn
       {id, :delete} ->
         remove(id)
-        Xandra.Batch.add(batch, delete_prepared, [{"text", id}])
+        Xandra.Batch.add(batch, delete_prepared, [id])
 
       {_id, currency} ->
         params = [
-          {"text", currency.name},
-          {"blob", currency.pubkey},
-          {"text", currency.picture},
-          {"int", currency.decimal},
-          {"text", currency.symbol},
-          {"bigint", currency.max_supply},
-          {"list<text>", currency.props},
-          {"bigint", currency.updated},
-          {"text", currency.id}
+          currency.name,
+          currency.pubkey,
+          currency.picture,
+          currency.decimal,
+          currency.symbol,
+          currency.max_supply,
+          currency.props,
+          currency.updated,
+          currency.id
         ]
 
         Xandra.Batch.add(batch, update_prepared, params)
@@ -318,11 +277,6 @@ defmodule Hashpay.Currency do
 
   def put(%__MODULE__{} = currency) do
     :ets.insert(:currencies, {currency.id, currency})
-  end
-
-  def put(conn, %__MODULE__{} = currency) do
-    :ets.insert(:currencies, {currency.id, currency})
-    update(conn, currency)
   end
 
   def exists?(conn, id) do

@@ -126,6 +126,11 @@ defmodule Hashpay.Balance do
   end
 
   def prepare_statements!(conn) do
+    insert_prepared = """
+    INSERT INTO balances (id, balances, creation, updated)
+    VALUES (?, ?, ?, ?);
+    """
+
     update_statement = """
     UPDATE balances
     SET balances[?] = ?, updated = ?
@@ -138,11 +143,17 @@ defmodule Hashpay.Balance do
     WHERE id = ?;
     """
 
+    insert_prepared = Xandra.prepare!(conn, insert_prepared)
     update_prepared = Xandra.prepare!(conn, update_statement)
     delete_prepared = Xandra.prepare!(conn, delete_statement)
 
+    :persistent_term.put({:stmt, "balances_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "balances_update"}, update_prepared)
     :persistent_term.put({:stmt, "balances_delete"}, delete_prepared)
+  end
+
+  def insert_prepared do
+    :persistent_term.get({:stmt, "balances_insert"})
   end
 
   def update_prepared do
@@ -151,6 +162,15 @@ defmodule Hashpay.Balance do
 
   def delete_prepared do
     :persistent_term.get({:stmt, "balances_delete"})
+  end
+
+  def batch_save(batch, balance) do
+    Xandra.Batch.add(batch, insert_prepared(), [
+      balance.id,
+      balance.balances,
+      balance.creation,
+      balance.updated
+    ])
   end
 
   def batch_sync(batch) do
@@ -163,14 +183,14 @@ defmodule Hashpay.Balance do
     |> Stream.map(fn
       {{id, name} = tuple, :delete} ->
         remove(tuple)
-        Xandra.Batch.add(batch, delete_prepared, [{"text", name}, {"text", id}])
+        Xandra.Batch.add(batch, delete_prepared, [name, id])
 
       {{id, name}, balance} ->
         params = [
-          {"text", name},
-          {"bigint", balance},
-          {"bigint", Hashpay.get_last_round_id()},
-          {"text", id}
+          name,
+          balance,
+          Hashpay.get_last_round_id(),
+          id
         ]
 
         Xandra.Batch.add(batch, update_prepared, params)
@@ -191,7 +211,7 @@ defmodule Hashpay.Balance do
   end
 
   def delete(batch, id, name) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", name}, {"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [name, id])
     remove({id, name})
   end
 

@@ -195,6 +195,21 @@ defmodule Hashpay.Validator do
     Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
   end
 
+  def batch_update_fields(batch, map, id) do
+    set_clause =
+      Enum.map_join(map, ", ", fn {field, value} ->
+        "#{field} = :#{value}"
+      end)
+
+    statement = """
+    UPDATE validators
+    SET #{set_clause}
+    WHERE id = :id;
+    """
+
+    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
+  end
+
   def get(conn, id) do
     statement = "SELECT * FROM validators WHERE id = ?;"
     params = [{"text", id}]
@@ -250,11 +265,6 @@ defmodule Hashpay.Validator do
     :ets.insert(:validators, {validator.id, validator})
   end
 
-  def put(conn, %__MODULE__{} = validator) do
-    :ets.insert(:validators, {validator.id, validator})
-    update(conn, validator)
-  end
-
   def exists?(conn, id) do
     statement = "SELECT id FROM validators WHERE id = ? LIMIT 1"
     params = [{"text", id}]
@@ -271,63 +281,9 @@ defmodule Hashpay.Validator do
     end
   end
 
-  # def update(conn, %__MODULE__{} = validator, fields \\ []) do
-  #   if Enum.empty?(fields) do
-  #     update_all(conn, validator)
-  #   else
-  #     update_fields(conn, validator, fields)
-  #   end
-  # end
-
-  def update(conn, %__MODULE__{} = validator) do
-    statement = """
-    UPDATE validators
-    SET hostname = ?, port = ?, name = ?, channel = ?, pubkey = ?, picture = ?, factor_a = ?, factor_b = ?, active = ?, failures = ?, updated = ?
-    WHERE id = ?;
-    """
-
-    params = [
-      {"text", validator.hostname},
-      {"int", validator.port},
-      {"text", validator.name},
-      {"text", validator.channel},
-      {"blob", validator.pubkey},
-      {"text", validator.picture},
-      {"double", validator.factor_a},
-      {"int", validator.factor_b},
-      {"boolean", validator.active},
-      {"int", validator.failures},
-      {"bigint", validator.updated},
-      {"text", validator.id}
-    ]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, validator}
-      error -> error
-    end
-  end
-
-  def update_fields(conn, map, id) do
-    set_clause =
-      Enum.map_join(map, ", ", fn {field, value} ->
-        "#{field} = :#{value}"
-      end)
-
-    statement = """
-    UPDATE validators
-    SET #{set_clause}
-    WHERE id = :id;
-    """
-
-    case DB.execute(conn, statement, Map.put(map, :id, id)) do
-      {:ok, _} -> :ok
-      error -> error
-    end
-  end
-
   def drop_table(conn) do
     statement = "DROP TABLE IF EXISTS validators;"
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
   end
 
   def row_to_struct(row) do
