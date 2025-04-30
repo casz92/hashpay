@@ -141,19 +141,19 @@ defmodule Hashpay.Merchant do
 
   def batch_save(batch, merchant) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", merchant.id},
-      {"text", merchant.name},
-      {"text", merchant.channel},
-      {"blob", merchant.pubkey},
-      {"text", merchant.picture},
-      {"boolean", merchant.active},
-      {"bigint", merchant.creation},
-      {"bigint", merchant.updated}
+      merchant.id,
+      merchant.name,
+      merchant.channel,
+      merchant.pubkey,
+      merchant.picture,
+      merchant.active,
+      merchant.creation,
+      merchant.updated
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def count(conn) do

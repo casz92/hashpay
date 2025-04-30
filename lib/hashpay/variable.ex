@@ -89,7 +89,7 @@ defmodule Hashpay.Variable do
   end
 
   def batch_delete(batch, key) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", key}])
+    Xandra.Batch.add(batch, delete_prepared(), [key])
   end
 
   @impl true

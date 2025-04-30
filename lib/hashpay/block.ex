@@ -303,21 +303,21 @@ defmodule Hashpay.Block do
 
   def batch_save(batch, block) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"bigint", block.id},
-      {"text", block.creator},
-      {"text", block.channel},
-      {"bigint", block.height},
-      {"bigint", block.round},
-      {"blob", block.hash},
-      {"blob", block.filehash},
-      {"blob", block.prev},
-      {"blob", block.signature},
-      {"bigint", block.timestamp},
-      {"int", block.count},
-      {"int", block.rejected},
-      {"int", block.size},
-      {"int", block.status},
-      {"int", block.vsn}
+      block.id,
+      block.creator,
+      block.channel,
+      block.height,
+      block.round,
+      block.hash,
+      block.filehash,
+      block.prev,
+      block.signature,
+      block.timestamp,
+      block.count,
+      block.rejected,
+      block.size,
+      block.status,
+      block.vsn
     ])
   end
 

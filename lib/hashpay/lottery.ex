@@ -88,23 +88,23 @@ defmodule Hashpay.Lottery do
 
   def batch_save(batch, lottery) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", lottery.id},
-      {"text", lottery.description},
-      {"bigint", lottery.prize_amount},
-      {"text", lottery.prize_currency},
-      {"bigint", lottery.start_date},
-      {"bigint", lottery.end_date},
-      {"int", lottery.status},
-      {"int", lottery.match_digits},
-      {"text", lottery.number_winner},
-      {"text", lottery.channel},
-      {"bigint", lottery.claim_deadline},
-      {"boolean", lottery.has_accumulated},
-      {"int", lottery.min_participants},
-      {"bigint", lottery.ticket_price},
-      {"int", lottery.max_winners},
-      {"text", lottery.verification_url},
-      {"bigint", lottery.creation}
+      lottery.id,
+      lottery.description,
+      lottery.prize_amount,
+      lottery.prize_currency,
+      lottery.start_date,
+      lottery.end_date,
+      lottery.status,
+      lottery.match_digits,
+      lottery.number_winner,
+      lottery.channel,
+      lottery.claim_deadline,
+      lottery.has_accumulated,
+      lottery.min_participants,
+      lottery.ticket_price,
+      lottery.max_winners,
+      lottery.verification_url,
+      lottery.creation
     ])
   end
 

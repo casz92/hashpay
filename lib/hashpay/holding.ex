@@ -115,17 +115,17 @@ defmodule Hashpay.Holding do
 
   def batch_save(batch, holding) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", holding.id},
-      {"text", holding.account_id},
-      {"text", holding.currency_id},
-      {"bigint", holding.amount},
-      {"double", holding.apr},
-      {"bigint", holding.creation}
+      holding.id,
+      holding.account_id,
+      holding.currency_id,
+      holding.amount,
+      holding.apr,
+      holding.creation
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def batch_update_fields(batch, map, id) do

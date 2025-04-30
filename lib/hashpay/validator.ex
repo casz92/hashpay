@@ -175,24 +175,24 @@ defmodule Hashpay.Validator do
 
   def batch_save(batch, validator) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", validator.id},
-      {"text", validator.hostname},
-      {"int", validator.port},
-      {"text", validator.name},
-      {"text", validator.channel},
-      {"blob", validator.pubkey},
-      {"text", validator.picture},
-      {"double", validator.factor_a},
-      {"int", validator.factor_b},
-      {"boolean", validator.active},
-      {"int", validator.failures},
-      {"bigint", validator.creation},
-      {"bigint", validator.updated}
+      validator.id,
+      validator.hostname,
+      validator.port,
+      validator.name,
+      validator.channel,
+      validator.pubkey,
+      validator.picture,
+      validator.factor_a,
+      validator.factor_b,
+      validator.active,
+      validator.failures,
+      validator.creation,
+      validator.updated
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def batch_update_fields(batch, map, id) do

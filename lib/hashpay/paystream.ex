@@ -136,25 +136,25 @@ defmodule Hashpay.Paystream do
 
   def batch_save(batch, paystream) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", paystream.id},
-      {"text", paystream.account_id},
-      {"text", paystream.currency_id},
-      {"text", paystream.merchant_id},
-      {"bigint", paystream.amount},
-      {"bigint", paystream.last_paystream},
-      {"bigint", paystream.creation}
+      paystream.id,
+      paystream.account_id,
+      paystream.currency_id,
+      paystream.merchant_id,
+      paystream.amount,
+      paystream.last_paystream,
+      paystream.creation
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def batch_incr(batch, id, amount, last_paystream) do
     Xandra.Batch.add(batch, incr_prepared(), [
-      {"bigint", amount},
-      {"text", id},
-      {"bigint", last_paystream}
+      amount,
+      id,
+      last_paystream
     ])
   end
 

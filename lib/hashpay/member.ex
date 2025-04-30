@@ -104,16 +104,16 @@ defmodule Hashpay.Member do
 
   def batch_save(batch, member) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", member.group_id},
-      {"text", member.member_id},
-      {"text", member.role},
-      {"bigint", member.creation},
-      {"map<text, text>", member.meta}
+      member.group_id,
+      member.member_id,
+      member.role,
+      member.creation,
+      member.meta
     ])
   end
 
   def batch_delete(batch, group_id, member_id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", group_id}, {"text", member_id}])
+    Xandra.Batch.add(batch, delete_prepared(), [group_id, member_id])
   end
 
   @spec exists?(pid(), String.t(), String.t()) :: boolean()

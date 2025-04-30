@@ -95,17 +95,17 @@ defmodule Hashpay.Account do
 
   def batch_save(batch, account) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", account.id},
-      {"text", account.name},
-      {"blob", account.pubkey},
-      {"text", account.channel},
-      {"boolean", account.verified},
-      {"int", account.type_alg}
+      account.id,
+      account.name,
+      account.pubkey,
+      account.channel,
+      account.verified,
+      account.type_alg
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def prepare_statements!(conn) do

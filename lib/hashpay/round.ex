@@ -305,19 +305,19 @@ defmodule Hashpay.Round do
 
   def batch_save(batch, round) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"bigint", round.id},
-      {"blob", round.hash},
-      {"blob", round.prev},
-      {"text", round.creator},
-      {"blob", round.signature},
-      {"bigint", round.reward},
-      {"int", round.count},
-      {"int", round.txs},
-      {"int", round.size},
-      {"tinyint", round.status},
-      {"bigint", round.timestamp},
-      {"frozen<list<blob>>", round.blocks},
-      {"int", round.vsn}
+      round.id,
+      round.hash,
+      round.prev,
+      round.creator,
+      round.signature,
+      round.reward,
+      round.count,
+      round.txs,
+      round.size,
+      round.status,
+      round.timestamp,
+      round.blocks,
+      round.vsn
     ])
   end
 

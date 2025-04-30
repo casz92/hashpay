@@ -134,20 +134,20 @@ defmodule Hashpay.Plan do
 
   def batch_save(batch, plan) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", plan.id},
-      {"text", plan.merchant_id},
-      {"text", plan.currency_id},
-      {"bigint", plan.amount},
-      {"int", plan.status},
-      {"int", plan.period},
-      {"bigint", plan.due_date},
-      {"text", plan.description},
-      {"bigint", plan.creation}
+      plan.id,
+      plan.merchant_id,
+      plan.currency_id,
+      plan.amount,
+      plan.status,
+      plan.period,
+      plan.due_date,
+      plan.description,
+      plan.creation
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def batch_update_fields(batch, map, id) do

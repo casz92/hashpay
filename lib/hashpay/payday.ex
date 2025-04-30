@@ -136,18 +136,18 @@ defmodule Hashpay.Payday do
 
   def batch_save(batch, payday) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", payday.id},
-      {"text", payday.account_id},
-      {"text", payday.currency_id},
-      {"bigint", payday.amount},
-      {"bigint", payday.last_payday},
-      {"bigint", payday.last_withdraw},
-      {"bigint", payday.creation}
+      payday.id,
+      payday.account_id,
+      payday.currency_id,
+      payday.amount,
+      payday.last_payday,
+      payday.last_withdraw,
+      payday.creation
     ])
   end
 
   def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [{"text", id}])
+    Xandra.Batch.add(batch, delete_prepared(), [id])
   end
 
   def batch_update_fields(batch, map, id) do

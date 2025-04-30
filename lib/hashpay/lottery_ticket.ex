@@ -113,11 +113,11 @@ defmodule Hashpay.LotteryTicket do
 
   def batch_save(batch, ticket) do
     Xandra.Batch.add(batch, insert_prepared(), [
-      {"text", ticket.id},
-      {"text", ticket.lottery_id},
-      {"text", ticket.account_id},
-      {"text", ticket.number},
-      {"bigint", ticket.creation}
+      ticket.id,
+      ticket.lottery_id,
+      ticket.account_id,
+      ticket.number,
+      ticket.creation
     ])
   end
 
