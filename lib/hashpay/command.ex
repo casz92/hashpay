@@ -30,6 +30,7 @@ defmodule Hashpay.Command do
     :timestamp
   ]
 
+  alias Hashpay.Validator
   alias Hashpay.DB
   alias Hashpay.Merchant
   alias Hashpay.Account
@@ -67,10 +68,6 @@ defmodule Hashpay.Command do
     %{command | hash: hash(command)}
   end
 
-  # def verify_hash(command, hash) do
-  #   hash(command) == hash
-  # end
-
   def sign(command, private_key) do
     {:ok, signature} = Cafezinho.Impl.sign(hash(command), private_key)
     %{command | signature: signature}
@@ -83,16 +80,49 @@ defmodule Hashpay.Command do
   @spec fetch_sender(pid(), String.t()) ::
           {:ok, Account.t() | Merchant.t()} | {:error, :not_found} | {:error, String.t()}
   def fetch_sender(conn, id) do
-    cond do
-      Account.match?(id) ->
+    <<prefix::binary-3, _rest::binary>> = id
+
+    case prefix do
+      "ac_" ->
         Account.fetch(conn, id)
 
-      Merchant.match?(id) ->
+      "v_" ->
+        Validator.fetch(conn, id)
+
+      "mc_" ->
         Merchant.fetch(conn, id)
 
-      true ->
+      _ ->
         {:error, "Invalid sender"}
     end
+  end
+
+  @threads Application.compile_env(:hashpay, :threads)
+
+  @spec thread(Hashpay.Function.t(), t()) :: non_neg_integer()
+  def thread(fun, cmd) do
+    result =
+      case fun.thread do
+        :sender ->
+          :erlang.phash2(cmd.from.id)
+
+        :type_and_args ->
+          :erlang.phash2(cmd.args) + fun.id
+
+        :type_and_sender ->
+          :erlang.phash2(cmd.from.id) + fun.id
+
+        :args ->
+          :erlang.phash2(cmd.args)
+
+        :type ->
+          fun.id
+
+        :hash ->
+          :erlang.phash2(cmd.hash)
+      end
+
+    rem(result, @threads)
   end
 
   @spec handle(t()) :: {:ok, any()} | {:error, String.t()}
@@ -110,10 +140,13 @@ defmodule Hashpay.Command do
               true ->
                 context = Context.new(command, function, sender)
 
-                case apply(function.mod, function.fun, [context | command.args]) do
-                  {:error, reason} -> {:error, reason}
-                  result -> result
-                end
+                # case :erlang.apply(function.mod, function.fun, [context | command.args]) do
+                #   {:error, reason} -> {:error, reason}
+                #   result -> result
+                # end
+
+                thread = thread(function, command)
+                SpawnPool.cast(:worker_pool, thread, context)
             end
 
           {:error, :not_found} ->
@@ -125,6 +158,13 @@ defmodule Hashpay.Command do
 
       _ ->
         {:error, "Function not found"}
+    end
+  end
+
+  def run(context = %{command: command, fun: function}) do
+    case apply(function.mod, function.fun, [context | command.args]) do
+      {:error, _reason} = err -> err
+      result -> result
     end
   end
 end

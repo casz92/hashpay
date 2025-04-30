@@ -29,6 +29,7 @@ defmodule Hashpay.Application do
     version = vsn()
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
+    threads = get_env(:threads, 2)
 
     db_opts = get_env(:scylla, nil)
 
@@ -37,6 +38,7 @@ defmodule Hashpay.Application do
 
     # Configuración para HTTP
     children = [
+      {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
       # PubSub para comunicación entre procesos
       Hashpay.Hits,
       Hashpay.PubSub,

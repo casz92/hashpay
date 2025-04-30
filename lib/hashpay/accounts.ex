@@ -23,7 +23,7 @@ defmodule Hashpay.Account do
   ]
 
   @prefix "ac_"
-  @regex ~r/^ac_[a-zA-Z0-9]$/
+  @regex ~r/^ac_[a-zA-Z0-9]*$/
 
   def generate_id(pubkey) do
     <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
@@ -70,7 +70,7 @@ defmodule Hashpay.Account do
     DB.execute!(conn, statement)
 
     indices = [
-      "CREATE INDEX IF NOT EXISTS ON accounts (name);",
+      "CREATE INDEX IF NOT EXISTS ON accounts (name);"
     ]
 
     Enum.each(indices, fn index ->
@@ -287,24 +287,19 @@ defmodule Hashpay.Account do
     end
   end
 
-  def update(conn, %__MODULE__{} = account) do
+  def batch_update_fields(batch, map, id) do
+    set_clause =
+      Enum.map_join(map, ", ", fn {field, value} ->
+        "#{field} = :#{value}"
+      end)
+
     statement = """
     UPDATE accounts
-    SET pubkey = ?, channel = ?, type_alg = ?
-    WHERE id = ?;
+    SET #{set_clause}
+    WHERE id = :id;
     """
 
-    params = [
-      {"blob", account.pubkey},
-      {"text", account.channel},
-      {"int", account.type_alg},
-      {"text", account.id}
-    ]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, _} -> {:ok, account}
-      error -> error
-    end
+    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
   end
 
   def put(%__MODULE__{} = account) do

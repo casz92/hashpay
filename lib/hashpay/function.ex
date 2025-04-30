@@ -8,7 +8,7 @@ defmodule Hashpay.Function do
    - mod: Módulo que contiene la función
    - fun: Nombre de la función
    - auth_type: Tipo de autenticación requerida
-   - segment: Segmento de la blockchain donde se ejecuta la función
+   - thread: Thread de ejecución
    - cost: Costo de ejecución de la función
 
    auth_type: 0: ninguna, 1: firma digital
@@ -22,8 +22,8 @@ defmodule Hashpay.Function do
     :mod,
     :fun,
     auth_type: 1,
-    cost: 0,
-    segment: 0
+    cost: 1,
+    thread: :sender
   ]
 
   @type t :: %__MODULE__{
@@ -33,7 +33,7 @@ defmodule Hashpay.Function do
           fun: atom(),
           auth_type: 0 | 1,
           cost: non_neg_integer(),
-          segment: non_neg_integer()
+          thread: atom()
         }
 end
 

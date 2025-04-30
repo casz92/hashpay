@@ -53,6 +53,8 @@ defmodule Hashpay.Validator do
     :updated
   ]
 
+  @prefix "v_"
+
   @impl true
   def up(conn) do
     create_table(conn)
@@ -119,15 +121,20 @@ defmodule Hashpay.Validator do
     end
   end
 
-  def generate_id do
-    Hashpay.gen_id("val_")
+  def generate_id(pubkey) do
+    <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
+    IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
+  end
+
+  def match?(id) do
+    Regex.match?(~r/^v_[a-zA-Z0-9]*$/, id)
   end
 
   def new(attrs) do
     last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
-      id: generate_id(),
+      id: generate_id(attrs[:pubkey]),
       hostname: attrs[:hostname],
       port: attrs[:port],
       name: attrs[:name],

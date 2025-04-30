@@ -11,7 +11,8 @@ defmodule Hashpay.Functions do
       name: "createAccount",
       mod: Hashpay.Account.Commands,
       fun: :create,
-      auth_type: 0
+      auth_type: 0,
+      thread: :type_and_args
     },
     %Function{
       id: 2,
@@ -25,7 +26,8 @@ defmodule Hashpay.Functions do
       name: "changeNameAccount",
       mod: Hashpay.Account.Commands,
       fun: :change_name,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 4,
@@ -39,28 +41,32 @@ defmodule Hashpay.Functions do
       name: "deleteAccount",
       mod: Hashpay.Account.Commands,
       fun: :delete,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 6,
       name: "verifyAccount",
       mod: Hashpay.Account.Commands,
       fun: :verify,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 100,
       name: "createCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :create,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 101,
       name: "changeNameCurrency",
       mod: Hashpay.Currency.Commands,
       fun: :change_name,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 102,
@@ -88,7 +94,8 @@ defmodule Hashpay.Functions do
       name: "mintCoins",
       mod: Hashpay.Balance.Commands,
       fun: :mint,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type
     },
     %Function{
       id: 201,
@@ -102,14 +109,16 @@ defmodule Hashpay.Functions do
       name: "freezeCoins",
       mod: Hashpay.Balance.Commands,
       fun: :freeze,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type
     },
     %Function{
       id: 203,
       name: "unfreezeCoins",
       mod: Hashpay.Balance.Commands,
       fun: :unfreeze,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type
     },
     %Function{
       id: 204,
@@ -123,14 +132,16 @@ defmodule Hashpay.Functions do
       name: "createValidator",
       mod: Hashpay.Validator.Commands,
       fun: :create,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 301,
       name: "changeNameValidator",
       mod: Hashpay.Validator.Commands,
       fun: :update,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 302,
@@ -172,21 +183,24 @@ defmodule Hashpay.Functions do
       name: "deleteValidator",
       mod: Hashpay.Validator.Commands,
       fun: :delete,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 400,
       name: "createMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :create,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 401,
       name: "changeNameMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :update,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 402,
@@ -228,21 +242,24 @@ defmodule Hashpay.Functions do
       name: "deleteMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :delete,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 500,
       name: "addMember",
       mod: Hashpay.Member.Commands,
       fun: :create,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 501,
       name: "removeMember",
       mod: Hashpay.Member.Commands,
       fun: :delete,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type_and_args
     },
     %Function{
       id: 600,
@@ -333,14 +350,16 @@ defmodule Hashpay.Functions do
       name: "setVariable",
       mod: Hashpay.Variable.Commands,
       fun: :set,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type
     },
     %Function{
       id: 1100,
       name: "deleteVariable",
       mod: Hashpay.Variable.Commands,
       fun: :delete,
-      auth_type: 1
+      auth_type: 1,
+      thread: :type
     }
   ]
 

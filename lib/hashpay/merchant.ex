@@ -39,7 +39,7 @@ defmodule Hashpay.Merchant do
   ]
 
   @prefix "mc_"
-  @regex ~r/^mc_[a-zA-Z0-9]$/
+  @regex ~r/^mc_[a-zA-Z0-9]*$/
 
   @impl true
   def up(conn) do
