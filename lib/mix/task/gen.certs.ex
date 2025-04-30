@@ -51,15 +51,9 @@ defmodule Mix.Tasks.Gen.Certs do
         rdnca = Keyword.get(opts, :rdnca, "/C=UK/L=London/O=Acme/CN=Sample")
         hostname = Keyword.get(opts, :hostname, "localhost") |> String.split(",", trim: true)
         validity = Keyword.get(opts, :validity, 365)
-        # # Ruta donde se guardarán los archivos
         certs_path = Keyword.get(opts, :dir, "priv/certs")
         rsa = Keyword.get(opts, :rsa, false)
         keysize = Keyword.get(opts, :keysize, 2048)
-
-        # key = X509.PrivateKey.new_rsa(keysize)
-
-        # # Crear certificado autofirmado
-        # cert = X509.Certificate.self_signed(key, "/CN=#{hostname}", hash: :sha, validity: validity)
 
         ca_key =
           if rsa do
