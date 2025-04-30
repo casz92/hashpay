@@ -29,11 +29,6 @@ config :logger, :console,
   format: "[$level] $message\n",
   level: :debug
 
-# Configuración para el pool de procesos
-config :hashpay, :poolboy,
-  size: 5,
-  max_overflow: 2
-
 # Configuración para Broadway
 config :hashpay, :broadway,
   # Módulo productor a definir
@@ -44,8 +39,3 @@ config :hashpay, :broadway,
   batchers: [
     default: [concurrency: 2, batch_size: 10]
   ]
-
-# Configuración para HMAC
-config :hashpay, :hmac,
-  default_secret: "dev_secret_key",
-  algorithm: :sha256

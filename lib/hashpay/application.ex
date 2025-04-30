@@ -74,7 +74,7 @@ defmodule Hashpay.Application do
         {:ok, pid}
 
       {:error, reason} ->
-        Logger.error("Failed to start Hashpay 💥: #{inspect(reason)}")
+        Logger.error("Failed to start Hashpay 💥\n#{inspect(reason)}")
         {:error, reason}
     end
   end

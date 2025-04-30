@@ -98,6 +98,8 @@ defmodule Hashpay.Command do
   end
 
   @threads Application.compile_env(:hashpay, :threads)
+  @channel Application.compile_env(:hashpay, :channel)
+  @default_channel Application.compile_env(:hashpay, :default_channel)
 
   @spec thread(Hashpay.Function.t(), t()) :: non_neg_integer()
   def thread(%{thread: :roundrobin}, _cmd) do
@@ -145,17 +147,14 @@ defmodule Hashpay.Command do
         case fetch_sender(conn, command.from) do
           {:ok, sender} ->
             cond do
+              sender.channel != @channel && sender.channel != @default_channel ->
+                {:error, "Invalid channel"}
+
               function.auth_type == 1 && !verify_signature(command, sender.public_key) ->
                 {:error, "Invalid signature"}
 
               true ->
                 context = Context.new(command, function, sender)
-
-                # case :erlang.apply(function.mod, function.fun, [context | command.args]) do
-                #   {:error, reason} -> {:error, reason}
-                #   result -> result
-                # end
-
                 thread = thread(function, command)
                 SpawnPool.cast(:worker_pool, thread, context)
             end

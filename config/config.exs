@@ -12,5 +12,7 @@ import_config "genesis.exs"
 config :hashpay, :channel, "first"
 config :hashpay, :threads, System.schedulers_online()
 
+config :ex_aws, json_codec: Jason
+
 # Importar configuraciones específicas del entorno
 import_config "#{config_env()}.exs"

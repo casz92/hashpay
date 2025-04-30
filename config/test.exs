@@ -29,8 +29,3 @@ config :hashpay, :broadway,
   batchers: [
     default: [concurrency: 1, batch_size: 5]
   ]
-
-# Configuración para HMAC
-config :hashpay, :hmac,
-  default_secret: "test_secret_key",
-  algorithm: :sha256

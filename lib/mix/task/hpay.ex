@@ -12,6 +12,9 @@ defmodule Mix.Tasks.Hpay do
       "rollback" ->
         Mix.Tasks.Migrate.run(["down" | rest])
 
+      "gen.certs" ->
+        Mix.Tasks.Gen.Certs.run(rest)
+
       x when x == "version" or x == "v" ->
         IO.puts("""
         Hashpay version v#{Application.spec(:hashpay, :vsn)}

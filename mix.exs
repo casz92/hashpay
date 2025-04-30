@@ -44,8 +44,8 @@ defmodule Hashpay.MixProject do
         :logger,
         :crypto,
         :xandra,
-        :broadway,
-        :poolboy,
+        # :broadway,
+        # :poolboy,
         :runtime_tools,
         :bandit,
         :plug,
@@ -75,20 +75,19 @@ defmodule Hashpay.MixProject do
       {:decimal, "~> 2.1"},
 
       # Broadway - Procesamiento de datos concurrente
-      {:broadway, "~> 1.2.1"},
+      # {:broadway, "~> 1.2.1"},
 
       # Poolboy - Gestión de pool de procesos
-      {:poolboy, "~> 1.5.2"},
+      # {:poolboy, "~> 1.5.2"},
 
       # Bandit - Servidor HTTP/HTTPS
       {:bandit, "~> 1.6"},
 
       # Plug - Framework para aplicaciones web
       {:plug, "~> 1.15"},
-      {:plug_cowboy, "~> 2.6"},
 
       # X509 - Para generar certificados SSL
-      {:x509, "~> 0.8"},
+      {:x509, "~> 0.8", runtime: false},
 
       # WebSock - Abstracción para WebSockets
       {:websock, "~> 0.5"},
@@ -109,7 +108,6 @@ defmodule Hashpay.MixProject do
       # ExAws - Cliente para AWS
       {:ex_aws, "~> 2.5"},
       {:ex_aws_s3, "~> 2.5"},
-      {:poison, "~> 3.0"},
       {:hackney, "~> 1.9"},
       # Cliente para WebSocket
       {:websocket_client, "~> 1.0"},

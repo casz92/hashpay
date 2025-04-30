@@ -14,9 +14,6 @@ config :logger, :console,
 
 # Configuración para ScyllaDB/Cassandra usando Xandra
 config :hashpay, :scylla,
-  nodes: ["localhost:9042"],
-  keyspace: "hashpay_prod",
-  # authentication: {"username", "password"},
   connect_timeout: 5000,
   name: :xandra_pool,
   default_consistency: :one,
@@ -29,11 +26,6 @@ config :hashpay, :scylla,
     buffer: 1_000_000
   ]
 
-# Configuración para el pool de procesos
-config :hashpay, :poolboy,
-  size: 10,
-  max_overflow: 5
-
 # Configuración para Broadway
 config :hashpay, :broadway,
   # Módulo productor a definir
@@ -44,8 +36,3 @@ config :hashpay, :broadway,
   batchers: [
     default: [concurrency: 5, batch_size: 20]
   ]
-
-# Configuración para HMAC
-config :hashpay, :hmac,
-  # El secreto debe ser configurado en runtime.exs
-  algorithm: :sha256
