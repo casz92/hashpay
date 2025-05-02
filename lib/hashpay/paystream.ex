@@ -62,7 +62,7 @@ defmodule Hashpay.Paystream do
       last_paystream bigint,
       creation bigint,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -113,9 +113,9 @@ defmodule Hashpay.Paystream do
     incr_statement =
       "UPDATE paystreams SET amount = ?, last_paystream = ? WHERE id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
-    incr_prepared = Xandra.prepare!(conn, incr_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
+    incr_prepared = DB.prepare!(conn, incr_statement)
 
     :persistent_term.put({:stmt, "paystreams_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "paystreams_delete"}, delete_prepared)

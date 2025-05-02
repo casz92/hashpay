@@ -62,7 +62,7 @@ defmodule Hashpay.Payday do
       last_withdraw bigint,
       creation bigint,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -113,9 +113,9 @@ defmodule Hashpay.Payday do
     incr_statement =
       "UPDATE paydays SET amount = ?, last_withdraw = ? WHERE id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
-    incr_prepared = Xandra.prepare!(conn, incr_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
+    incr_prepared = DB.prepare!(conn, incr_statement)
 
     :persistent_term.put({:stmt, "paydays_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "paydays_delete"}, delete_prepared)

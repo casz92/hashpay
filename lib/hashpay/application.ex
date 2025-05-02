@@ -38,12 +38,17 @@ defmodule Hashpay.Application do
     # Configuración para HTTP
     children = [
       {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
-      # PubSub para comunicación entre procesos
+      :poolboy.child_spec(:event_consumer_pool, get_env(:event_consumer_pool, nil)),
+      {RoundEventConsumer, []},
       Hashpay.Hits,
+      # PubSub para comunicación entre procesos
       Hashpay.PubSub,
       {Hashpay.Cluster, name: :cluster},
       # Conexión a ScyllaDB
       {Hashpay.DB, db_opts},
+      {Hashpay.Redis, get_env(:redis, [])},
+      # Conexión a PostgreSQL
+      # {Postgrex, get_env(:postgres, [])},
       # Servidor HTTP
       {Bandit, plug: Hashpay.Router, port: http_port, startup_log: :debug},
 
@@ -69,6 +74,7 @@ defmodule Hashpay.Application do
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
         conn = DB.get_conn()
+        setup_events()
         load_objects(conn)
         Logger.info("Hashpay v#{version} started with #{threads} threads ✨")
         {:ok, pid}
@@ -100,6 +106,23 @@ defmodule Hashpay.Application do
     Holding.init(conn)
     Lottery.init(conn)
     LotteryTicket.init(conn)
+  end
+
+  defp setup_events do
+    EventBus.subscribe(
+      {BlockEventConsumer,
+       [
+         :block_creating,
+         :block_created,
+         :block_uploaded,
+         :block_published,
+         :block_received,
+         :block_downloaded,
+         :block_verifying,
+         :block_failed,
+         :block_completed
+       ]}
+    )
   end
 
   # Función auxiliar para obtener configuración del entorno

@@ -45,7 +45,7 @@ defmodule Hashpay.Lottery do
       verification_url text,
       creation bigint,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -77,7 +77,7 @@ defmodule Hashpay.Lottery do
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
 
     :persistent_term.put({:stmt, "lotteries_insert"}, insert_prepared)
   end

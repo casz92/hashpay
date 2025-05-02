@@ -82,7 +82,7 @@ defmodule Hashpay.Validator do
       creation bigint,
       updated bigint,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -158,8 +158,8 @@ defmodule Hashpay.Validator do
 
     delete_statement = "DELETE FROM validators WHERE id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "validators_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "validators_delete"}, delete_prepared)

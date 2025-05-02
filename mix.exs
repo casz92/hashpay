@@ -43,15 +43,17 @@ defmodule Hashpay.MixProject do
       extra_applications: [
         :logger,
         :crypto,
-        :xandra,
         # :broadway,
-        # :poolboy,
+        :poolboy,
+        :xandra,
+        :postgrex,
         :runtime_tools,
         :bandit,
         :plug,
         :websock,
         :websock_adapter,
-        :telemetry
+        :telemetry,
+        :event_bus
       ]
     ]
   end
@@ -74,11 +76,14 @@ defmodule Hashpay.MixProject do
       # Requerido por Xandra
       {:decimal, "~> 2.1"},
 
+      # PostgreSQL driver
+      {:postgrex, "~> 0.17.3"},
+
       # Broadway - Procesamiento de datos concurrente
       # {:broadway, "~> 1.2.1"},
 
       # Poolboy - Gestión de pool de procesos
-      # {:poolboy, "~> 1.5.2"},
+      {:poolboy, "~> 1.5"},
 
       # Bandit - Servidor HTTP/HTTPS
       {:bandit, "~> 1.6"},
@@ -109,10 +114,17 @@ defmodule Hashpay.MixProject do
       {:ex_aws, "~> 2.5"},
       {:ex_aws_s3, "~> 2.5"},
       {:hackney, "~> 1.9"},
+
       # Cliente para WebSocket
       {:websocket_client, "~> 1.0"},
+
       # Cliente para descarga de archivos
-      {:download, "~> 0.0.4"}
+      {:download, "~> 0.0.4"},
+
+      # Event bus - Dispatcher de eventos
+      {:event_bus, "~> 1.7.0"},
+      # eredis - Cliente para Redis
+      {:eredis, "~> 1.7"}
     ]
   end
 end

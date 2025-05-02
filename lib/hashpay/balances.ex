@@ -5,19 +5,17 @@ defmodule Hashpay.Balance do
 
   @type t :: %__MODULE__{
           id: String.t(),
-          balances: map(),
-          creation: non_neg_integer(),
+          name: String.t(),
+          amount: non_neg_integer(),
           updated: non_neg_integer()
         }
 
   defstruct [
     :id,
-    balances: %{},
-    creation: 0,
+    :name,
+    :amount,
     updated: 0
   ]
-
-  @default_currency Application.compile_env(:hashpay, :default_currency)
 
   @impl true
   def up(conn) do
@@ -33,21 +31,21 @@ defmodule Hashpay.Balance do
     statement = """
     CREATE TABLE IF NOT EXISTS balances (
       id text,
-      balances map<text, bigint>,
-      creation bigint,
+      name text,
+      amount decimal,
       updated bigint,
-      PRIMARY KEY (id)
-    );
+      PRIMARY KEY (id, name)
+    ) WITH transactions = {'enabled': 'true'};
     """
 
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
   end
 
-  def new(account_id, amount \\ 0) do
+  def new(account_id, name, amount \\ 0) do
     %__MODULE__{
       id: account_id,
-      balances: %{@default_currency => amount},
-      creation: Hashpay.get_last_round_id(),
+      name: name,
+      amount: amount,
       updated: Hashpay.get_last_round_id()
     }
   end
@@ -101,9 +99,13 @@ defmodule Hashpay.Balance do
     end
   end
 
+  def fetch(conn, id, name) do
+    fetch(conn, {id, name})
+  end
+
   def get(conn, {id, name}) do
-    statement = "SELECT balances[?] as amount FROM balances WHERE id = ?;"
-    params = [{"text", name}, {"text", id}]
+    statement = "SELECT amount FROM balances WHERE id = ? and name = ?;"
+    params = [{"text", id}, {"text", name}]
 
     case DB.execute(conn, statement, params) do
       {:ok, %Xandra.Page{} = page} ->
@@ -127,25 +129,23 @@ defmodule Hashpay.Balance do
 
   def prepare_statements!(conn) do
     insert_prepared = """
-    INSERT INTO balances (id, balances, creation, updated)
+    INSERT INTO balances (id, name, amount, updated)
     VALUES (?, ?, ?, ?);
     """
 
     update_statement = """
     UPDATE balances
-    SET balances[?] = ?, updated = ?
-    WHERE id = ?;
+    SET amount = amount + ?, updated = ?
+    WHERE id = ? and name = ?;
     """
 
     delete_statement = """
-    UPDATE balances
-    SET balances[?] = null
-    WHERE id = ?;
+    DELETE FROM balances WHERE id = ?;
     """
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    update_prepared = Xandra.prepare!(conn, update_statement)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    update_prepared = DB.prepare!(conn, update_statement)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "balances_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "balances_update"}, update_prepared)
@@ -164,11 +164,20 @@ defmodule Hashpay.Balance do
     :persistent_term.get({:stmt, "balances_delete"})
   end
 
+  def batch_update(batch, account_id, currency_id, amount) do
+    Xandra.Batch.add(batch, update_prepared(), [
+      currency_id,
+      amount,
+      Hashpay.get_last_round_id(),
+      account_id
+    ])
+  end
+
   def batch_save(batch, balance) do
     Xandra.Batch.add(batch, insert_prepared(), [
       balance.id,
-      balance.balances,
-      balance.creation,
+      balance.name,
+      balance.amount,
       balance.updated
     ])
   end
@@ -177,7 +186,7 @@ defmodule Hashpay.Balance do
     # Preparar consultas solo una vez
     update_prepared = update_prepared()
     delete_prepared = delete_prepared()
-
+    now = Hashpay.get_last_round_id()
     # Optimizar con Stream para evitar acumulación en memoria
     fetch_all()
     |> Stream.map(fn
@@ -187,10 +196,10 @@ defmodule Hashpay.Balance do
 
       {{id, name}, balance} ->
         params = [
-          name,
           balance,
-          Hashpay.get_last_round_id(),
-          id
+          now,
+          id,
+          name
         ]
 
         Xandra.Batch.add(batch, update_prepared, params)
@@ -203,11 +212,16 @@ defmodule Hashpay.Balance do
     :ets.tab2list(:balances)
   end
 
-  @spec incr(tuple(), integer()) :: integer()
+  @spec incr(tuple(), integer()) :: any()
   def incr(tuple, amount) do
-    result = :ets.update_counter(:balances, tuple, {2, amount}, {tuple, 0 + amount})
+    :ets.update_counter(:balances, tuple, {2, amount}, {tuple, amount})
     Hits.hit(tuple, :balance)
-    result
+  end
+
+  @spec incr(Xandra.Batch.t(), String.t(), String.t(), integer()) :: any()
+  def incr(batch, account_id, currency_id, amount) do
+    incr({account_id, currency_id}, amount)
+    batch_update(batch, account_id, currency_id, amount)
   end
 
   def delete(batch, id, name) do
@@ -224,8 +238,8 @@ defmodule Hashpay.Balance do
   def row_to_struct(row) do
     struct!(__MODULE__, %{
       id: row["id"],
-      balances: row["balances"],
-      creation: row["creation"],
+      name: row["name"],
+      amount: row["amount"],
       updated: row["updated"]
     })
   end

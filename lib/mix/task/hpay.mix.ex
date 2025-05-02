@@ -6,14 +6,20 @@ defmodule Mix.Tasks.Hpay do
       "run" ->
         Mix.Tasks.Run.run(["--no-halt", "--no-compile"])
 
+      "db.create" ->
+        Mix.Tasks.Migrate.run(["db.create" | rest])
+
+      "db.drop" ->
+        Mix.Tasks.Migrate.run(["db.drop" | rest])
+
       "migrate" ->
-        Mix.Tasks.Migrate.run(["up" | rest])
+        Mix.Tasks.Migrate.run(rest)
 
       "rollback" ->
         Mix.Tasks.Migrate.run(["down" | rest])
 
-      "gen.certs" ->
-        Mix.Tasks.Gen.Certs.run(rest)
+      "certs" ->
+        Mix.Tasks.Certs.run(rest)
 
       x when x == "version" or x == "v" ->
         IO.puts("""
@@ -27,7 +33,15 @@ defmodule Mix.Tasks.Hpay do
         """)
 
       _ ->
-        IO.puts("Invalid command")
+        IO.puts("""
+        Usage: mix hpay [run|migrate|rollback|version|help]
+        """)
     end
+  end
+
+  def run(_) do
+    IO.puts("""
+    Usage: mix hpay [run|migrate|rollback|version|help]
+    """)
   end
 end

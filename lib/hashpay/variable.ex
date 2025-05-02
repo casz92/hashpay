@@ -33,6 +33,10 @@ defmodule Hashpay.Variable do
     :persistent_term.get({:var, "round_size_target"}, 0.05)
   end
 
+  def get_currency_creation_cost do
+    :persistent_term.get({:var, "currency_creation_cost"}, 1000)
+  end
+
   def create_table(conn, keyspace \\ nil) do
     if keyspace do
       DB.use_keyspace(conn, keyspace)
@@ -43,7 +47,7 @@ defmodule Hashpay.Variable do
       key text,
       value blob,
       PRIMARY KEY (key)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -66,8 +70,8 @@ defmodule Hashpay.Variable do
 
     delete_statement = "DELETE FROM variables WHERE key = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "variables_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "variables_delete"}, delete_prepared)
@@ -126,8 +130,9 @@ defmodule Hashpay.Variable do
       |> batch_save(%Variable{key: "round_rewarded_base", value: 10})
       |> batch_save(%Variable{key: "round_rewarded_transactions", value: 0.1})
       |> batch_save(%Variable{key: "round_size_target", value: 0.05})
+      |> batch_save(%Variable{key: "currency_creation_cost", value: 1_000_000})
 
-    Xandra.execute(conn, batch)
+    DB.execute!(conn, batch)
   end
 
   @impl true

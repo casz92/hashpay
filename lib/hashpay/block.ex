@@ -248,7 +248,7 @@ defmodule Hashpay.Block do
       status int,
       vsn int,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute!(conn, statement)
@@ -292,7 +292,7 @@ defmodule Hashpay.Block do
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
 
     :persistent_term.put({:stmt, "blocks_insert"}, insert_prepared)
   end

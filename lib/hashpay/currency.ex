@@ -7,7 +7,7 @@ defmodule Hashpay.Currency do
   - name: Nombre de la moneda
   - pubkey: Clave pública del propietario de la moneda
   - picture: URL de la imagen de la moneda
-  - decimal: Número de decimales de la moneda
+  - decimals: Número de decimales de la moneda
   - symbol: Símbolo de la moneda
   - max_supply: Suministro máximo de la moneda
   - props: Propiedades adicionales de la moneda
@@ -22,7 +22,7 @@ defmodule Hashpay.Currency do
           name: String.t(),
           pubkey: binary() | nil,
           picture: String.t() | nil,
-          decimal: non_neg_integer(),
+          decimals: non_neg_integer(),
           symbol: String.t(),
           max_supply: non_neg_integer(),
           props: [String.t()] | nil,
@@ -35,7 +35,7 @@ defmodule Hashpay.Currency do
     :name,
     :pubkey,
     :picture,
-    :decimal,
+    :decimals,
     :symbol,
     :max_supply,
     :props,
@@ -48,7 +48,7 @@ defmodule Hashpay.Currency do
     :name,
     :pubkey,
     :picture,
-    :decimal,
+    :decimals,
     :symbol,
     :max_supply,
     :props,
@@ -57,6 +57,8 @@ defmodule Hashpay.Currency do
   ]
 
   @prefix "cu_"
+  @regex ~r/^(cu_)[A-Z]{1,5}$/
+  @regex_name ~r/^[A-Z]{1,5}$/
 
   @impl true
   def up(conn) do
@@ -75,14 +77,14 @@ defmodule Hashpay.Currency do
       name text,
       pubkey blob,
       picture text,
-      decimal int,
+      decimals int,
       symbol text,
       max_supply bigint,
       props list<text>,
       creation bigint,
       updated bigint,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -98,8 +100,18 @@ defmodule Hashpay.Currency do
 
   def drop_table(conn) do
     statement = "DROP TABLE IF EXISTS currencies;"
-    DB.execute(conn, statement)
+    DB.execute!(conn, statement)
   end
+
+  def match?(id) do
+    Regex.match?(@regex, id)
+  end
+
+  def match_name?(name) do
+    Regex.match?(@regex_name, name)
+  end
+
+  def ticker(<<@prefix, ticker::binary>>), do: ticker
 
   @impl true
   def init(conn) do
@@ -136,7 +148,7 @@ defmodule Hashpay.Currency do
       name: attrs[:name],
       pubkey: attrs[:pubkey],
       picture: attrs[:picture],
-      decimal: attrs[:decimal],
+      decimals: attrs[:decimals],
       symbol: attrs[:symbol],
       max_supply: attrs[:max_supply],
       props: attrs[:props],
@@ -147,14 +159,14 @@ defmodule Hashpay.Currency do
 
   def prepare_statements!(conn) do
     insert_prepared = """
-    INSERT INTO currencies (id, name, pubkey, picture, decimal, symbol, max_supply, props, creation, updated)
+    INSERT INTO currencies (id, name, pubkey, picture, decimals, symbol, max_supply, props, creation, updated)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     delete_statement = "DELETE FROM currencies WHERE id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "currencies_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "currencies_delete"}, delete_prepared)
@@ -174,7 +186,7 @@ defmodule Hashpay.Currency do
       currency.name,
       currency.pubkey,
       currency.picture,
-      currency.decimal,
+      currency.decimals,
       currency.symbol,
       currency.max_supply,
       currency.props,
@@ -224,15 +236,15 @@ defmodule Hashpay.Currency do
 
     update_statement = """
     UPDATE currencies
-    SET name = ?, pubkey = ?, picture = ?, decimal = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
+    SET name = ?, pubkey = ?, picture = ?, decimals = ?, symbol = ?, max_supply = ?, props = ?, updated = ?
     WHERE id = ?;
     """
 
     delete_statement = "DELETE FROM currencies WHERE id = ?;"
 
     # Preparar consultas solo una vez
-    update_prepared = Xandra.prepare!(conn, update_statement)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    update_prepared = DB.prepare!(conn, update_statement)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     # Optimizar con Stream para evitar acumulación en memoria
     fetch_all()
@@ -246,7 +258,7 @@ defmodule Hashpay.Currency do
           currency.name,
           currency.pubkey,
           currency.picture,
-          currency.decimal,
+          currency.decimals,
           currency.symbol,
           currency.max_supply,
           currency.props,
@@ -280,18 +292,12 @@ defmodule Hashpay.Currency do
   end
 
   def exists?(conn, id) do
-    statement = "SELECT id FROM currencies WHERE id = ? LIMIT 1"
-    params = [{"text", id}]
+    case fetch(conn, id) do
+      {:ok, _currency} ->
+        true
 
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [] -> false
-          _ -> true
-        end
-
-      error ->
-        error
+      _error ->
+        false
     end
   end
 
@@ -338,7 +344,7 @@ defmodule Hashpay.Currency do
       name: row["name"],
       pubkey: row["pubkey"],
       picture: row["picture"],
-      decimal: row["decimal"],
+      decimals: row["decimals"],
       symbol: row["symbol"],
       max_supply: row["max_supply"],
       props: row["props"],

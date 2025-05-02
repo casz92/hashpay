@@ -26,6 +26,16 @@ config :hashpay, :scylla,
     buffer: 1_000_000
   ]
 
+# Configuración para PostgreSQL usando Postgrex
+config :hashpay, :postgres,
+  hostname: "localhost",
+  username: "postgres",
+  password: "postgres",
+  database: "hashpay",
+  port: 5432,
+  pool_size: 20,
+  ssl: true
+
 # Configuración para Broadway
 config :hashpay, :broadway,
   # Módulo productor a definir

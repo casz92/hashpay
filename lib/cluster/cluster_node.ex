@@ -37,7 +37,7 @@ defmodule Hashpay.ClusterNode do
       pubkey blob,
       role text,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute!(conn, statement)

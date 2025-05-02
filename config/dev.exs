@@ -11,7 +11,7 @@ config :hashpay,
 config :hashpay, :scylla,
   nodes: ["localhost:9042"],
   keyspace: "hashpay_dev",
-  # authentication: {"username", "password"},
+  # authentication: {"yugabyte", "yugabyte"},
   connect_timeout: 5000,
   name: :xandra_pool,
   default_consistency: :one,
@@ -23,6 +23,16 @@ config :hashpay, :scylla,
     # Tamaño del buffer en bytes
     buffer: 1_000_000
   ]
+
+# Configuración para PostgreSQL usando Postgrex
+config :hashpay, :postgres,
+  hostname: "localhost",
+  username: "yugabyte",
+  password: "yugabyte",
+  database: "hashpay_dev",
+  port: 5433,
+  pool_size: 10,
+  show_sensitive_data_on_connection_error: true
 
 # Configuración para el logger en desarrollo
 config :logger, :console,

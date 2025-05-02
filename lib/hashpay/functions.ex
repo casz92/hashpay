@@ -106,17 +106,17 @@ defmodule Hashpay.Functions do
     },
     %Function{
       id: 202,
-      name: "freezeCoins",
+      name: "frozenCoins",
       mod: Hashpay.Balance.Commands,
-      fun: :freeze,
+      fun: :frozen,
       auth_type: 1,
       thread: :type
     },
     %Function{
       id: 203,
-      name: "unfreezeCoins",
+      name: "unfrozenCoins",
       mod: Hashpay.Balance.Commands,
-      fun: :unfreeze,
+      fun: :unfrozen,
       auth_type: 1,
       thread: :type
     },

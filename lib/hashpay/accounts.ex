@@ -64,7 +64,7 @@ defmodule Hashpay.Account do
       verified boolean,
       type_alg int,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute!(conn, statement)
@@ -116,8 +116,8 @@ defmodule Hashpay.Account do
 
     delete_statement = "DELETE FROM accounts WHERE id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "accounts_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "accounts_delete"}, delete_prepared)
@@ -188,6 +188,16 @@ defmodule Hashpay.Account do
           error ->
             error
         end
+    end
+  end
+
+  def exists?(conn, id) do
+    case fetch(conn, id) do
+      {:ok, _account} ->
+        true
+
+      _error ->
+        false
     end
   end
 

@@ -39,6 +39,23 @@ if config_env() == :prod do
   config :hashpay, :scylla,
     nodes: scylla_nodes,
     keyspace: System.get_env("SCYLLA_KEYSPACE", "hashpay_dev")
+
+  # Configuración de PostgreSQL para producción
+  postgres_hostname = System.get_env("POSTGRES_HOSTNAME", "localhost")
+  postgres_username = System.get_env("POSTGRES_USERNAME", "postgres")
+  postgres_password = System.get_env("POSTGRES_PASSWORD", "postgres")
+  postgres_database = System.get_env("POSTGRES_DATABASE", "hashpay")
+  postgres_port = String.to_integer(System.get_env("POSTGRES_PORT", "5432"))
+  postgres_pool_size = String.to_integer(System.get_env("POSTGRES_POOL_SIZE", "20"))
+
+  config :hashpay, :postgres,
+    hostname: postgres_hostname,
+    username: postgres_username,
+    password: postgres_password,
+    database: postgres_database,
+    port: postgres_port,
+    pool_size: postgres_pool_size,
+    ssl: true
 end
 
 # Configuración de la carpeta de datos
@@ -60,6 +77,10 @@ config :ex_aws,
 
 config :hashpay, :s3_endpoint, [s3_scheme, s3_region, ".", s3_host] |> IO.iodata_to_binary()
 config :hashpay, :s3_bucket, System.get_env("S3_BUCKET", "my-bucket")
+
+config :hashpay, :redis,
+  name: :redis,
+  url: System.get_env("REDIS_URL", "redis://localhost:6379/0")
 
 config :hashpay,
        :deny_function,

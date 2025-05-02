@@ -69,7 +69,7 @@ defmodule Hashpay.Plan do
       description text,
       creation bigint,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
@@ -117,8 +117,8 @@ defmodule Hashpay.Plan do
 
     delete_statement = "DELETE FROM plans WHERE id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "plans_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "plans_delete"}, delete_prepared)

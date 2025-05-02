@@ -11,7 +11,7 @@ defmodule Hashpay.DB do
   def start_link(opts) do
     version = Application.spec(:xandra, :vsn)
 
-    case Xandra.start_link(opts) do
+    case Xandra.Cluster.start_link(opts) do
       {:ok, pid} ->
         Logger.debug("Running #{@module_name} with Xandra v#{version} ✅")
         :persistent_term.put(@connection_key, pid)
@@ -89,15 +89,23 @@ defmodule Hashpay.DB do
   - `{:error, reason}` si hay un error
   Xandra.execute(:xandra_pool, "DESCRIBE TABLES;", [])
   """
-  def execute(conn, statement, params \\ [], options \\ []) do
-    Xandra.execute(conn, statement, params, options)
+  def execute(conn, batch) do
+    Xandra.Cluster.execute(conn, batch)
+  end
+
+  def execute(conn, statement, params, options \\ []) do
+    Xandra.Cluster.execute(conn, statement, params, options)
   end
 
   @doc """
   Ejecuta una consulta CQL y devuelve el resultado o lanza una excepción en caso de error.
   """
-  def execute!(conn, statement, params \\ [], options \\ []) do
-    Xandra.execute!(conn, statement, params, options)
+  def execute!(conn, batch) do
+    Xandra.Cluster.execute!(conn, batch)
+  end
+
+  def execute!(conn, statement, params, options \\ []) do
+    Xandra.Cluster.execute!(conn, statement, params, options)
   end
 
   @doc """
@@ -119,25 +127,37 @@ defmodule Hashpay.DB do
     WITH REPLICATION = #{replication}
     """
 
-    execute(conn, statement)
+    execute!(conn, statement)
+  end
+
+  def drop_keyspace(conn, keyspace) do
+    statement = """
+    DROP KEYSPACE IF EXISTS #{keyspace}
+    """
+
+    execute!(conn, statement)
   end
 
   @doc """
   Usa un keyspace específico.
   """
   def use_keyspace(conn, keyspace) do
-    execute(conn, "USE #{keyspace}")
+    execute!(conn, "USE #{keyspace}")
   end
 
   @doc """
   Prepara una consulta CQL.
   """
   def prepare(conn, statement) do
-    Xandra.prepare(conn, statement)
+    Xandra.Cluster.prepare(conn, statement)
   end
 
   def prepare!(conn, statement) do
-    Xandra.prepare!(conn, statement)
+    Xandra.Cluster.prepare!(conn, statement)
+  end
+
+  def stop(conn) do
+    Xandra.Cluster.stop(conn)
   end
 end
 
@@ -145,19 +165,19 @@ defmodule Hashpay.DB.Cluster do
   @pool_name :xandra_pool
 
   def execute(statement, params \\ [], options \\ []) do
-    Xandra.execute(@pool_name, statement, params, options)
+    Xandra.Cluster.execute(@pool_name, statement, params, options)
   end
 
   def execute!(statement, params \\ [], options \\ []) do
-    Xandra.execute!(@pool_name, statement, params, options)
+    Xandra.Cluster.execute!(@pool_name, statement, params, options)
   end
 
   def prepare(statement) do
-    Xandra.prepare(@pool_name, statement)
+    Xandra.Cluster.prepare(@pool_name, statement)
   end
 
   def prepare!(statement) do
-    Xandra.prepare!(@pool_name, statement)
+    Xandra.Cluster.prepare!(@pool_name, statement)
   end
 
   @doc """

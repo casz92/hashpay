@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Gen.Certs do
+defmodule Mix.Tasks.Certs do
   use Mix.Task
 
   @shortdoc "Genera certificados autofirmados para desarrollo"
@@ -34,7 +34,7 @@ defmodule Mix.Tasks.Gen.Certs do
     case opts[:help] do
       true ->
         IO.puts("""
-        Usage: mix gen.certs [options]
+        Usage: mix certs [options]
         Options:
           --help: Mostrar esta ayuda
           --rdn: RDN para el certificado root

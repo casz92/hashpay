@@ -41,12 +41,20 @@ defmodule Hashpay.Member do
       member_id text,
       role text,
       creation bigint,
-      meta MAP<text, text>,
+      meta map<text, text>,
       PRIMARY KEY (group_id, member_id)
-    ) with clustering order by (member_id desc);
+    ) with transactions = {'enabled': 'true'};
     """
 
     DB.execute(conn, statement)
+
+    indices = [
+      "CREATE INDEX IF NOT EXISTS ON members (member_id);"
+    ]
+
+    Enum.each(indices, fn index ->
+      DB.execute!(conn, index)
+    end)
   end
 
   def drop_table(conn) do
@@ -87,8 +95,8 @@ defmodule Hashpay.Member do
 
     delete_statement = "DELETE FROM members WHERE group_id = ? AND member_id = ?;"
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
-    delete_prepared = Xandra.prepare!(conn, delete_statement)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
+    delete_prepared = DB.prepare!(conn, delete_statement)
 
     :persistent_term.put({:stmt, "members_insert"}, insert_prepared)
     :persistent_term.put({:stmt, "members_delete"}, delete_prepared)

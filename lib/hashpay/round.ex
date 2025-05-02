@@ -262,15 +262,15 @@ defmodule Hashpay.Round do
       blocks frozen<list<blob>>,
       vsn int,
       PRIMARY KEY (id)
-    );
+    ) WITH transactions = {'enabled': 'true'};
     """
 
     DB.execute!(conn, statement)
 
     # Crear índices para búsquedas eficientes
     indices = [
-      "CREATE INDEX IF NOT EXISTS ON rounds (hash);",
-      "CREATE INDEX IF NOT EXISTS ON rounds (creator);"
+      "CREATE INDEX IF NOT EXISTS rounds_hash_idx ON rounds (hash);",
+      "CREATE INDEX IF NOT EXISTS rounds_creator_idx ON rounds (creator);"
     ]
 
     Enum.each(indices, fn index ->
@@ -294,7 +294,7 @@ defmodule Hashpay.Round do
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    insert_prepared = Xandra.prepare!(conn, insert_prepared)
+    insert_prepared = DB.prepare!(conn, insert_prepared)
 
     :persistent_term.put({:stmt, "rounds_insert"}, insert_prepared)
   end
