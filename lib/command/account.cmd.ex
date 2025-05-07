@@ -4,7 +4,7 @@ defmodule Hashpay.Account.Command do
 
   @spec create(Context.t(), String.t(), binary(), String.t()) ::
           {:ok, Account.t()} | {:error, String.t()}
-  def create(ctx, name, pubkey, channel) do
+  def create(ctx = %{db: db}, name, pubkey, channel) do
     account =
       Account.new(%{
         name: name,
@@ -12,65 +12,65 @@ defmodule Hashpay.Account.Command do
         channel: channel
       })
 
-    Account.fetch(ctx.conn, account.id)
+    Account.fetch(db, account.id)
     |> case do
       {:ok, _} ->
         {:error, "Account already exists"}
 
       {:error, :not_found} ->
-        Account.batch_save(ctx.batch, account)
+        Account.put(db, account)
     end
   end
 
-  def change_pubkey(ctx, pubkey) do
-    Account.fetch(ctx.conn, ctx.sender.id)
+  def change_pubkey(ctx = %{db: db}, pubkey) do
+    Account.fetch(db, ctx.sender.id)
     |> case do
       {:ok, account} ->
-        Account.batch_update_fields(ctx.batch, %{pubkey: pubkey}, account.id)
+        Account.put(db, Map.put(account, :pubkey, pubkey))
 
       {:error, :not_found} ->
         {:error, "Account not found"}
     end
   end
 
-  def change_name(ctx, name) do
-    Account.fetch(ctx.conn, ctx.sender.id)
+  def change_name(ctx = %{db: db}, name) do
+    Account.fetch(db, ctx.sender.id)
     |> case do
       {:ok, account} ->
-        Account.batch_update_fields(ctx.batch, %{name: name}, account.id)
+        Account.put(db, Map.put(account, :name, name))
 
       {:error, :not_found} ->
         {:error, "Account not found"}
     end
   end
 
-  def change_channel(ctx, channel) do
-    Account.fetch(ctx.conn, ctx.sender.id)
+  def change_channel(ctx = %{db: db}, channel) do
+    Account.fetch(db, ctx.sender.id)
     |> case do
       {:ok, account} ->
-        Account.batch_update_fields(ctx.batch, %{channel: channel}, account.id)
+        Account.put(db, Map.put(account, :channel, channel))
 
       {:error, :not_found} ->
         {:error, "Account not found"}
     end
   end
 
-  def delete(ctx) do
-    Account.fetch(ctx.conn, ctx.sender.id)
+  def delete(ctx = %{db: db}) do
+    Account.fetch(db, ctx.sender.id)
     |> case do
       {:ok, %{id: account_id}} ->
-        Account.batch_delete(ctx.batch, account_id)
+        Account.delete(db, account_id)
 
       {:error, :not_found} ->
         {:error, "Account not found"}
     end
   end
 
-  def verify(ctx, verified) do
-    Account.fetch(ctx.conn, ctx.sender.id)
+  def verify(ctx = %{db: db}, verified) do
+    Account.fetch(db, ctx.sender.id)
     |> case do
       {:ok, account} ->
-        Account.batch_update_fields(ctx.batch, %{verified: verified}, account.id)
+        Account.put(db, Map.put(account, :verified, verified))
 
       {:error, :not_found} ->
         {:error, "Account not found"}

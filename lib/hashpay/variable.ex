@@ -45,7 +45,7 @@ defmodule Hashpay.Variable do
     statement = """
     CREATE TABLE IF NOT EXISTS variables (
       key text,
-      value blob,
+      value bytea,
       PRIMARY KEY (key)
     ) WITH transactions = {'enabled': 'true'};
     """
@@ -70,11 +70,8 @@ defmodule Hashpay.Variable do
 
     delete_statement = "DELETE FROM variables WHERE key = ?;"
 
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-
-    :persistent_term.put({:stmt, "variables_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "variables_delete"}, delete_prepared)
+    DB.prepare!(conn, "variables_insert", insert_prepared)
+    DB.prepare!(conn, "variables_delete", delete_statement)
   end
 
   def insert_prepared do
@@ -94,6 +91,7 @@ defmodule Hashpay.Variable do
 
   def batch_delete(batch, key) do
     Xandra.Batch.add(batch, delete_prepared(), [key])
+    PostgrexBatch.add(batch, "variables_delete", [key])
   end
 
   @impl true
@@ -106,8 +104,9 @@ defmodule Hashpay.Variable do
     statement = "SELECT key, value FROM variables;"
 
     case DB.execute(conn, statement) do
-      {:ok, %Xandra.Page{} = page} ->
-        Enum.each(page, fn row ->
+      {:ok, %Postgrex.Result{columns: columns, rows: rows}} ->
+        Enum.each(rows, fn row ->
+          row = Enum.zip(columns, row)
           key = row["key"]
           value = row["value"] |> :erlang.binary_to_term()
           :persistent_term.put({:var, key}, value)

@@ -1,4 +1,4 @@
-defmodule Hashpay.Hits do
+defmodule Hashpay.Cache do
   @behaviour GenServer
   @moduledoc """
   Módulo para almacenar y gestionar hits (accesos) a objetos en una tabla ETS.
@@ -52,8 +52,8 @@ defmodule Hashpay.Hits do
     {:ok, args}
   end
 
-  @spec hit(binary(), Hashpay.object_type()) :: boolean()
-  def hit(id, type) do
+  @spec put(binary(), Hashpay.object_type()) :: boolean()
+  def put(id, type) do
     timestamp = now()
     :ets.insert(@table_name, {id, type, timestamp})
   end

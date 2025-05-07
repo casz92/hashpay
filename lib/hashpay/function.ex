@@ -56,8 +56,8 @@ defmodule Hashpay.Function.Context do
           cmd: Command.t(),
           fun: Hashpay.Function.t(),
           sender: Account.t() | Merchant.t() | nil,
-          db: pid(),
-          batch: Xandra.Batch.t(),
+          db: ThunderRAM.t(),
+          # batch: Xandra.Batch.t(),
           block: Block.t() | nil,
           round: Round.t() | nil
         }

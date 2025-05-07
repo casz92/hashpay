@@ -37,7 +37,7 @@ defmodule Hashpay.ClusterNode do
       pubkey blob,
       role text,
       PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
+    );
     """
 
     DB.execute!(conn, statement)
@@ -50,7 +50,7 @@ defmodule Hashpay.ClusterNode do
 
   def new(name, ip, pubkey, role) do
     %__MODULE__{
-      id: Hashpay.gen_id("node_"),
+      id: UUID.uuid4(),
       name: name,
       ip: ip,
       active: true,
@@ -62,16 +62,16 @@ defmodule Hashpay.ClusterNode do
   def save(conn, %__MODULE__{} = node) do
     statement = """
     INSERT INTO cluster_nodes (id, name, ip, active, pubkey, role)
-    VALUES (?, ?, ?, ?, ?, ?);
+    VALUES ($1, $2, $3, $4, $5, $6);
     """
 
     params = [
-      {"uuid", node.id},
-      {"text", node.name},
-      {"text", node.ip},
-      {"boolean", node.active},
-      {"blob", node.pubkey},
-      {"text", node.role}
+      node.id,
+      node.name,
+      node.ip,
+      node.active,
+      node.pubkey,
+      node.role
     ]
 
     case DB.execute(conn, statement, params) do
@@ -81,22 +81,21 @@ defmodule Hashpay.ClusterNode do
   end
 
   def delete(conn, id) do
-    statement = "DELETE FROM cluster_nodes WHERE id = ?;"
-    params = [{"uuid", id}]
+    statement = "DELETE FROM cluster WHERE id = $1;"
+    params = [id]
 
     DB.execute(conn, statement, params)
   end
 
   def get(conn, id) do
-    statement = "SELECT * FROM cluster_nodes WHERE id = ?;"
-    params = [{"uuid", id}]
+    statement = "SELECT * FROM cluster WHERE id = $1;"
+    params = [id]
 
     case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
+      {:ok, %Postgrex.Result{num_rows: num_rows} = result} ->
+        case num_rows do
+          1 -> {:ok, row_to_struct(DB.to_keyword(result))}
+          _ -> {:error, :not_found}
         end
 
       error ->
@@ -105,15 +104,14 @@ defmodule Hashpay.ClusterNode do
   end
 
   def get_by_name(conn, name) do
-    statement = "SELECT * FROM cluster_nodes WHERE name = ?;"
-    params = [{"text", name}]
+    statement = "SELECT * FROM cluster WHERE name = $1 LIMIT 1;"
+    params = [name]
 
     case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
+      {:ok, %Postgrex.Result{num_rows: num_rows} = result} ->
+        case num_rows do
+          1 -> {:ok, row_to_struct(DB.to_keyword(result))}
+          _ -> {:error, :not_found}
         end
 
       error ->
@@ -125,8 +123,11 @@ defmodule Hashpay.ClusterNode do
     statement = "SELECT * FROM cluster_nodes;"
 
     case DB.execute(conn, statement) do
-      {:ok, %Xandra.Page{} = page} ->
-        Enum.map(page, &row_to_struct/1)
+      {:ok, %Postgrex.Result{num_rows: num_rows} = result} ->
+        case num_rows do
+          0 -> []
+          _ -> DB.to_list(result, &row_to_struct/1)
+        end
 
       error ->
         error

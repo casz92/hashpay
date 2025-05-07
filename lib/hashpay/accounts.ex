@@ -1,6 +1,7 @@
 defmodule Hashpay.Account do
+  alias Hex.Netrc.Cache
   alias Hashpay.Account
-  alias Hashpay.Hits
+  alias Hashpay.Cache
   alias Hashpay.DB
   @behaviour Hashpay.MigrationBehaviour
 
@@ -24,6 +25,9 @@ defmodule Hashpay.Account do
 
   @prefix "ac_"
   @regex ~r/^ac_[a-zA-Z0-9]*$/
+  @trdb :accounts
+
+  @compile {:inline, [fetch: 2, fetch_by_channel: 3, delete: 2]}
 
   def generate_id(pubkey) do
     <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
@@ -54,141 +58,101 @@ defmodule Hashpay.Account do
     drop_table(conn)
   end
 
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS accounts (
-      id text,
-      name text,
-      pubkey blob,
-      channel text,
-      verified boolean,
-      type_alg int,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
+  def create_table(_conn) do
+    # statement = """
+    # CREATE TABLE IF NOT EXISTS accounts (
+    #   id text,
+    #   name text,
+    #   pubkey bytea,
+    #   channel text,
+    #   verified boolean,
+    #   type_alg integer,
+    #   PRIMARY KEY (id)
+    # );
+    # """
 
-    DB.execute!(conn, statement)
+    # DB.execute!(conn, statement)
 
-    indices = [
-      "CREATE INDEX IF NOT EXISTS ON accounts (name);"
-    ]
+    # indices = [
+    #   "CREATE INDEX IF NOT EXISTS idx_accounts_name ON accounts (name);"
+    # ]
 
-    Enum.each(indices, fn index ->
-      DB.execute!(conn, index)
-    end)
+    # Enum.each(indices, fn index ->
+    #   DB.execute!(conn, index)
+    # end)
   end
 
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS accounts;"
-    DB.execute!(conn, statement)
+  def drop_table(_conn) do
+    # statement = "DROP TABLE IF EXISTS accounts;"
+    # DB.execute!(conn, statement)
   end
 
   @impl true
-  def init(conn) do
-    create_ets_table()
-    prepare_statements!(conn)
+  def init(_conn) do
+    # prepare_statements!(conn)
   end
 
-  def create_ets_table do
-    :ets.new(:accounts, [:set, :public, :named_table])
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, :accounts, id)
   end
 
-  def batch_save(batch, account) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      account.id,
-      account.name,
-      account.pubkey,
-      account.channel,
-      account.verified,
-      account.type_alg
-    ])
-  end
+  # def prepare_statements!(conn) do
+  #   insert_prepared = """
+  #   INSERT INTO accounts (id, name, pubkey, channel, verified, type_alg)
+  #   VALUES :VALUES ON CONFLICT DO NOTHING;
+  #   """
 
-  def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [id])
-  end
+  #   delete_statement = "DELETE FROM accounts WHERE id in :VALUES;"
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO accounts (id, name, pubkey, channel, verified, type_alg)
-    VALUES (?, ?, ?, ?, ?, ?);
-    """
+  #   insert_prepared = DB.prepare!(conn, insert_prepared)
+  #   delete_prepared = DB.prepare!(conn, delete_statement)
 
-    delete_statement = "DELETE FROM accounts WHERE id = ?;"
+  #   :persistent_term.put({:stmt, "accounts_insert"}, insert_prepared)
+  #   :persistent_term.put({:stmt, "accounts_delete"}, delete_prepared)
+  # end
 
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
+  # def insert_prepared do
+  #   :persistent_term.get({:stmt, "accounts_insert"})
+  # end
 
-    :persistent_term.put({:stmt, "accounts_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "accounts_delete"}, delete_prepared)
-  end
+  # def delete_prepared do
+  #   :persistent_term.get({:stmt, "accounts_delete"})
+  # end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "accounts_insert"})
-  end
+  # def batch_sync(batch) do
+  #   # Optimizar con Stream para evitar acumulación en memoria
+  #   fetch_all()
+  #   |> Stream.map(fn
+  #     {id, :delete} ->
+  #       remove(id)
+  #       batch_delete(batch, id)
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "accounts_delete"})
-  end
+  #     {_id, account} ->
+  #       batch_save(batch, account)
+  #   end)
+  #   # Ejecuta el proceso sin acumular memoria innecesariamente
+  #   |> Stream.run()
+  # end
 
-  def batch_sync(batch) do
-    # Optimizar con Stream para evitar acumulación en memoria
-    fetch_all()
-    |> Stream.map(fn
-      {id, :delete} ->
-        remove(id)
-        batch_delete(batch, id)
+  # def count(conn) do
+  #   statement = "SELECT COUNT(*) FROM accounts;"
+  #   params = []
 
-      {_id, account} ->
-        batch_save(batch, account)
-    end)
-    # Ejecuta el proceso sin acumular memoria innecesariamente
-    |> Stream.run()
-  end
+  #   case DB.execute(conn, statement, params) do
+  #     {:ok, %Xandra.Page{} = page} ->
+  #       case Enum.to_list(page) do
+  #         [row] -> {:ok, row["count"]}
+  #         [] -> {:error, :not_found}
+  #         _ -> {:error, :multiple_results}
+  #       end
 
-  def count(conn) do
-    statement = "SELECT COUNT(*) FROM accounts;"
-    params = []
+  #     error ->
+  #       error
+  #   end
+  # end
 
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row["count"]}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def fetch(id) do
-    case :ets.lookup(:accounts, id) do
-      [{^id, account}] ->
-        Hits.hit(account.id, :account)
-        {:ok, account}
-
-      [] ->
-        {:error, :not_found}
-    end
-  end
-
-  def fetch(conn, id) do
-    case fetch(id) do
-      {:ok, account} ->
-        {:ok, account}
-
-      {:error, :not_found} ->
-        case get(conn, id) do
-          {:ok, account} ->
-            put(account)
-            {:ok, account}
-
-          error ->
-            error
-        end
-    end
+  def fetch(tr, id) do
+    ThunderRAM.get(tr, :accounts, id)
   end
 
   def exists?(conn, id) do
@@ -201,137 +165,209 @@ defmodule Hashpay.Account do
     end
   end
 
-  def fetch_by_channel(conn, id, channel) do
-    case fetch(id) do
+  def fetch_by_channel(tr, id, channel) do
+    case fetch(tr, id) do
       {:ok, account} ->
         (account.channel == channel && {:ok, account}) || {:error, :not_found}
 
-      {:error, :not_found} ->
-        get(conn, id, channel)
+      nil ->
+        nil
     end
   end
 
-  def fetch_all do
-    :ets.tab2list(:accounts)
-  end
+  # def fetch_all do
+  #   :ets.tab2list(:accounts)
+  # end
 
-  def get(conn, id) do
-    statement = "SELECT * FROM accounts WHERE id = ?;"
-    params = [{"text", id}]
+  # def get(conn, id) do
+  #   statement = "SELECT * FROM accounts WHERE id = ?;"
+  #   params = [{"text", id}]
 
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
+  #   case DB.execute(conn, statement, params) do
+  #     {:ok, %Postgrex.Result{rows: rows, columns: columns}} ->
+  #       case rows do
+  #         [row] -> {:ok, row_to_struct(row, columns)}
+  #         [] -> {:error, :not_found}
+  #         _ -> {:error, :multiple_results}
+  #       end
 
-      error ->
-        error
-    end
-  end
+  #     error ->
+  #       error
+  #   end
+  # end
 
-  def get(conn, id, channel) do
-    statement = "SELECT * FROM accounts WHERE id = ? AND channel = ?;"
-    params = [{"text", id}, {"text", channel}]
+  # def get(conn, id, channel) do
+  #   statement = "SELECT * FROM accounts WHERE id = ? AND channel = ?;"
+  #   params = [{"text", id}, {"text", channel}]
 
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
+  #   case DB.execute(conn, statement, params) do
+  #     {:ok, %Postgrex.Result{rows: rows, columns: columns}} ->
+  #       case rows do
+  #         [row] -> {:ok, row_to_struct(row, columns)}
+  #         [] -> {:error, :not_found}
+  #         _ -> {:error, :multiple_results}
+  #       end
 
-      error ->
-        error
-    end
-  end
+  #     error ->
+  #       error
+  #   end
+  # end
 
   def verified?(%Account{verified: verified}), do: verified
 
-  def verified?(conn, id) do
-    case fetch(conn, id) do
-      {:ok, account} -> account.verified
-      {:error, _} -> false
-    end
+  # def verified?(conn, id) do
+  #   case fetch(conn, id) do
+  #     {:ok, account} -> account.verified
+  #     {:error, _} -> false
+  #   end
+  # end
+
+  # def get_and_exists(conn, id, name) do
+  #   statement = "SELECT * FROM accounts WHERE id = ? OR name = ?;"
+  #   params = [{"text", id}, {"text", name}]
+
+  #   case DB.execute(conn, statement, params) do
+  #     {:ok, %Postgrex.Result{rows: rows, columns: columns}} ->
+  #       case rows do
+  #         [row] -> {:ok, row_to_struct(row, columns)}
+  #         [] -> {:error, :not_found}
+  #         _ -> {:error, :multiple_results}
+  #       end
+
+  #     error ->
+  #       error
+  #   end
+  # end
+
+  # def get_by_name(conn, name) do
+  #   statement = "SELECT * FROM accounts WHERE name = ?;"
+  #   params = [{"text", name}]
+
+  #   case DB.execute(conn, statement, params) do
+  #     {:ok, %Postgrex.Result{rows: rows, columns: columns}} ->
+  #       case rows do
+  #         [row] ->
+  #           {:ok, row_to_struct(row, columns)}
+
+  #         [] ->
+  #           {:error, :not_found}
+
+  #         _ ->
+  #           {:error, :multiple_results}
+  #       end
+
+  #     error ->
+  #       error
+  #   end
+  # end
+
+  # def batch_update_fields(batch, map, id) do
+  #   set_clause =
+  #     Enum.map_join(map, ", ", fn {field, value} ->
+  #       "#{field} = :#{value}"
+  #     end)
+
+  #   statement = """
+  #   UPDATE accounts
+  #   SET #{set_clause}
+  #   WHERE id = :id;
+  #   """
+
+  #   Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
+  # end
+
+  def prepare_bulks do
+    insert_account =
+      """
+      INSERT INTO accounts (id, name, pubkey, channel, verified, type_alg)
+      VALUES :VALUES ON CONFLICT DO NOTHING;
+      """
+
+    name_update =
+      """
+      UPDATE accounts AS a
+      SET name = b.name
+      FROM (
+      VALUES
+      :VALUES
+      ) AS b(id, name)
+      WHERE b.id = a.id;
+      """
+
+    pubkey_update =
+      """
+      UPDATE accounts AS a
+      SET pubkey = b.pubkey, sig_type = b.sig_type
+      FROM (
+      VALUES
+      :VALUES
+      ) AS b(id, pubkey, sig_type)
+      WHERE b.id = a.id;
+      """
+
+    channel_update =
+      """
+      UPDATE accounts AS a
+      SET channel = b.channel
+      FROM (
+      VALUES
+      :VALUES
+      ) AS b(id, channel)
+      WHERE b.id = a.id;
+      """
+
+    verified_update =
+      """
+      UPDATE accounts AS a
+      SET verified = b.verified
+      FROM (
+      VALUES
+      :VALUES
+      ) AS b(id, verified)
+      WHERE b.id = a.id;
+      """
+
+    delete_accounts =
+      """
+      DELETE FROM accounts
+      WHERE id IN (:VALUES);
+      """
+
+    :persistent_term.put({:stmt, "accounts_insert"}, insert_account)
+    :persistent_term.put({:stmt, "accounts_update_name"}, name_update)
+    :persistent_term.put({:stmt, "accounts_update_pubkey"}, pubkey_update)
+    :persistent_term.put({:stmt, "accounts_update_channel"}, channel_update)
+    :persistent_term.put({:stmt, "accounts_update_verified"}, verified_update)
+    :persistent_term.put({:stmt, "accounts_delete"}, delete_accounts)
   end
 
-  def get_and_exists(conn, id, name) do
-    statement = "SELECT * FROM accounts WHERE id = ? OR name = ?;"
-    params = [{"text", id}, {"text", name}]
+  # defp set_update_fields(varname, map) do
+  #   Map.keys(map)
+  #   |> Enum.map(fn field ->
+  #     "#{field} = #{varname}.#{field}"
+  #   end)
+  #   |> Enum.join(", ")
+  # end
 
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
+  # def remove(id) do
+  #   :ets.delete(:accounts, id)
+  # end
 
-      error ->
-        error
-    end
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 
-  def get_by_name(conn, name) do
-    statement = "SELECT * FROM accounts WHERE name = ?;"
-    params = [{"text", name}]
+  # def row_to_struct(row, columns) do
+  #   # Convertir la lista de valores a un mapa con nombres de columnas
+  #   row_kw = Enum.zip(columns, row) |> Enum.into(%{})
 
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] ->
-            {:ok, row_to_struct(row)}
-
-          [] ->
-            {:error, :not_found}
-
-          _ ->
-            {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def batch_update_fields(batch, map, id) do
-    set_clause =
-      Enum.map_join(map, ", ", fn {field, value} ->
-        "#{field} = :#{value}"
-      end)
-
-    statement = """
-    UPDATE accounts
-    SET #{set_clause}
-    WHERE id = :id;
-    """
-
-    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
-  end
-
-  def put(%__MODULE__{} = account) do
-    :ets.insert(:accounts, {account.id, account})
-    Hits.hit(account.id, :account)
-  end
-
-  def remove(id) do
-    :ets.delete(:accounts, id)
-    Hits.remove(id)
-  end
-
-  def delete(id) do
-    :ets.insert(:accounts, {id, :delete})
-  end
-
-  def row_to_struct(row) do
-    struct!(__MODULE__, %{
-      id: row["id"],
-      pubkey: row["pubkey"],
-      channel: row["channel"],
-      type_alg: row["type_alg"]
-    })
-  end
+  #   struct!(__MODULE__, %{
+  #     id: row_kw["id"],
+  #     name: row_kw["name"],
+  #     pubkey: row_kw["pubkey"],
+  #     channel: row_kw["channel"],
+  #     verified: row_kw["verified"],
+  #     type_alg: row_kw["type_alg"]
+  #   })
+  # end
 end

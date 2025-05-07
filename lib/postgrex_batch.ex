@@ -14,7 +14,7 @@ defmodule PostgrexBatch do
 
     %PostgrexBatch{
       conn: conn,
-      ets: :ets.new(:prepared_statements, [:set, :public])
+      ets: :ets.new(:prepared_statements, [:set, :public, read_concurrency: true])
     }
   end
 
@@ -141,19 +141,17 @@ defmodule PostgrexBatch do
     value
   end
 
-  @compile {:inline, bytea: 1}
+  @compile {:inline, bytea: 1, escape_text: 1, jsonb: 1}
   defp bytea(binary_data) do
     ["\\x", Base.encode16(binary_data, case: :lower)] |> IO.iodata_to_binary()
   end
 
-  @compile {:inline, escape_text: 1}
   defp escape_text(value) do
     value
     |> String.replace("'", "''")
     |> String.replace("\\", "\\\\")
   end
 
-  @compile {:inline, jsonb: 1}
   defp jsonb(map) do
     Jason.encode!(map)
   end

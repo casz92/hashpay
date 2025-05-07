@@ -2,22 +2,22 @@ defmodule Hashpay.Application do
   @moduledoc """
   Módulo de aplicación para Hashpay.
   """
-  alias Hashpay.Block
-  alias Hashpay.Round
-  alias Hashpay.Member
-  alias Hashpay.Plan
-  alias Hashpay.Balance
-  alias Hashpay.Payday
-  alias Hashpay.Paystream
-  alias Hashpay.Holding
-  alias Hashpay.LotteryTicket
-  alias Hashpay.Merchant
-  alias Hashpay.Account
-  alias Hashpay.DB
-  alias Hashpay.Validator
-  alias Hashpay.Variable
-  alias Hashpay.Currency
-  alias Hashpay.Lottery
+  # alias Hashpay.Block
+  # alias Hashpay.Round
+  # alias Hashpay.Member
+  # alias Hashpay.Plan
+  # alias Hashpay.Balance
+  # alias Hashpay.Payday
+  # alias Hashpay.Paystream
+  # alias Hashpay.Holding
+  # alias Hashpay.LotteryTicket
+  # alias Hashpay.Merchant
+  # alias Hashpay.Account
+  # alias Hashpay.DB
+  # alias Hashpay.Validator
+  # alias Hashpay.Variable
+  # alias Hashpay.Currency
+  # alias Hashpay.Lottery
   use Application
   require Logger
 
@@ -30,7 +30,7 @@ defmodule Hashpay.Application do
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
     threads = get_env(:threads, 2)
-    db_opts = get_env(:scylla, nil)
+    # db_opts = get_env(:postgres, nil)
 
     # Inicializar estado
     init_state()
@@ -40,13 +40,13 @@ defmodule Hashpay.Application do
       {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
       :poolboy.child_spec(:event_consumer_pool, get_env(:event_consumer_pool, nil)),
       {RoundEventConsumer, []},
-      Hashpay.Hits,
+      Hashpay.Cache,
       # PubSub para comunicación entre procesos
       Hashpay.PubSub,
       {Hashpay.Cluster, name: :cluster},
       # Conexión a ScyllaDB
-      {Hashpay.DB, db_opts},
-      {Hashpay.Redis, get_env(:redis, [])},
+      # {Hashpay.DB, db_opts},
+      # {Hashpay.Redis, get_env(:redis, [])},
       # Conexión a PostgreSQL
       # {Postgrex, get_env(:postgres, [])},
       # Servidor HTTP
@@ -73,9 +73,9 @@ defmodule Hashpay.Application do
 
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
-        conn = DB.get_conn()
+        # conn = DB.get_conn()
         setup_events()
-        load_objects(conn)
+        load_objects()
         Logger.info("Hashpay v#{version} started with #{threads} threads ✨")
         {:ok, pid}
 
@@ -90,22 +90,44 @@ defmodule Hashpay.Application do
     :persistent_term.put(:thread_counter, ref)
   end
 
-  defp load_objects(conn) do
-    Round.init(conn)
-    Block.init(conn)
-    Variable.init(conn)
-    Currency.init(conn)
-    Validator.init(conn)
-    Account.init(conn)
-    Merchant.init(conn)
-    Balance.init(conn)
-    Member.init(conn)
-    Plan.init(conn)
-    Payday.init(conn)
-    Paystream.init(conn)
-    Holding.init(conn)
-    Lottery.init(conn)
-    LotteryTicket.init(conn)
+  defp load_objects do
+    ThunderRAM.new(
+      name: :blockchain,
+      db: ~c"blockchain",
+      cfs: [
+        "variables",
+        "rounds",
+        "blocks",
+        "accounts",
+        "balances",
+        "currencies",
+        "merchants",
+        "members",
+        "plans",
+        "paydays",
+        "paystreams",
+        "holdings",
+        "lotteries",
+        "lottery_tickets"
+      ]
+    )
+    |> IO.inspect()
+
+    # Round.init(conn)
+    # Block.init(conn)
+    # Variable.init(conn)
+    # Currency.init(conn)
+    # Validator.init(conn)
+    # Account.init(conn)
+    # Merchant.init(conn)
+    # Balance.init(conn)
+    # Member.init(conn)
+    # Plan.init(conn)
+    # Payday.init(conn)
+    # Paystream.init(conn)
+    # Holding.init(conn)
+    # Lottery.init(conn)
+    # LotteryTicket.init(conn)
   end
 
   defp setup_events do

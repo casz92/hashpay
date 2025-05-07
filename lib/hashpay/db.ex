@@ -2,24 +2,25 @@ defmodule Hashpay.DB do
   use GenServer
   require Logger
 
-  @connection_key :scylla_connection
+  @connection_key :db_connection
   @module_name Module.split(__MODULE__) |> Enum.join(".")
+  @adapter Postgrex
 
   @doc """
   Inicia el proceso supervisado para manejar conexiones a ScyllaDB.
   """
   def start_link(opts) do
-    version = Application.spec(:xandra, :vsn)
+    version = Application.spec(Postgrex, :vsn)
 
-    case Xandra.Cluster.start_link(opts) do
+    case @adapter.start_link(opts) do
       {:ok, pid} ->
-        Logger.debug("Running #{@module_name} with Xandra v#{version} ✅")
+        Logger.debug("Running #{@module_name} with Postgrex v#{version} ✅")
         :persistent_term.put(@connection_key, pid)
         {:ok, pid}
 
       {:error, reason} ->
         Logger.error(
-          "Failed to start #{@module_name} with Xandra v#{version} ❌: #{inspect(reason)}"
+          "Failed to start #{@module_name} with Postgrex v#{version} ❌: #{inspect(reason)}"
         )
 
         {:error, reason}
@@ -38,7 +39,7 @@ defmodule Hashpay.DB do
   def get_conn_with_retry do
     case :persistent_term.get(@connection_key, :undefined) do
       :undefined ->
-        opts = Application.get_env(:hashpay, :scylla)
+        opts = Application.get_env(:hashpay, :postgres)
         {:ok, conn} = start_link(opts)
         conn
 
@@ -46,7 +47,7 @@ defmodule Hashpay.DB do
         if Process.alive?(conn) do
           conn
         else
-          opts = Application.get_env(:hashpay, :scylla)
+          opts = Application.get_env(:hashpay, :postgres)
           {:ok, conn} = start_link(opts)
           conn
         end
@@ -68,7 +69,7 @@ defmodule Hashpay.DB do
   end
 
   def new_batch(type \\ :unlogged) do
-    batch = Xandra.Batch.new(type)
+    batch = PostgrexBatch.new(type)
     :persistent_term.put(:batch, batch)
     batch
   end
@@ -89,23 +90,16 @@ defmodule Hashpay.DB do
   - `{:error, reason}` si hay un error
   Xandra.execute(:xandra_pool, "DESCRIBE TABLES;", [])
   """
-  def execute(conn, batch) do
-    Xandra.Cluster.execute(conn, batch)
-  end
 
-  def execute(conn, statement, params, options \\ []) do
-    Xandra.Cluster.execute(conn, statement, params, options)
+  def execute(conn, statement, params \\ [], options \\ []) do
+    @adapter.query(conn, statement, params, options)
   end
 
   @doc """
   Ejecuta una consulta CQL y devuelve el resultado o lanza una excepción en caso de error.
   """
-  def execute!(conn, batch) do
-    Xandra.Cluster.execute!(conn, batch)
-  end
-
-  def execute!(conn, statement, params, options \\ []) do
-    Xandra.Cluster.execute!(conn, statement, params, options)
+  def execute!(conn, statement, params \\ [], options \\ []) do
+    @adapter.query!(conn, statement, params, options)
   end
 
   @doc """
@@ -117,73 +111,61 @@ defmodule Hashpay.DB do
   - `keyspace`: Nombre del keyspace
   - `replication`: Configuración de replicación
   """
-  def create_keyspace(
-        conn,
-        keyspace,
-        replication \\ "{'class': 'SimpleStrategy', 'replication_factor': 1}"
-      ) do
+  def create_space(conn, name) do
     statement = """
-    CREATE KEYSPACE IF NOT EXISTS #{keyspace}
-    WITH REPLICATION = #{replication}
+    CREATE SCHEMA IF NOT EXISTS #{name}
     """
 
     execute!(conn, statement)
   end
 
-  def drop_keyspace(conn, keyspace) do
+  def drop_space(conn, name) do
     statement = """
-    DROP KEYSPACE IF EXISTS #{keyspace}
+    DROP SCHEMA IF EXISTS #{name}
     """
 
     execute!(conn, statement)
   end
 
   @doc """
-  Usa un keyspace específico.
+  Usa un keyspace/schema específico.
   """
-  def use_keyspace(conn, keyspace) do
-    execute!(conn, "USE #{keyspace}")
+  def use_space(conn, name) do
+    execute!(conn, "USE #{name}")
   end
 
   @doc """
   Prepara una consulta CQL.
   """
-  def prepare(conn, statement) do
-    Xandra.Cluster.prepare(conn, statement)
+  def prepare(conn, name, statement) do
+    @adapter.prepare(conn, name, statement)
   end
 
-  def prepare!(conn, statement) do
-    Xandra.Cluster.prepare!(conn, statement)
+  def prepare!(conn, name, statement) do
+    @adapter.prepare!(conn, name, statement)
+  end
+
+  def execute_prepared(conn, name, params \\ []) do
+    @adapter.execute(conn, name, params)
+  end
+
+  def execute_prepared!(conn, name, params \\ []) do
+    @adapter.execute!(conn, name, params)
   end
 
   def stop(conn) do
-    Xandra.Cluster.stop(conn)
-  end
-end
-
-defmodule Hashpay.DB.Cluster do
-  @pool_name :xandra_pool
-
-  def execute(statement, params \\ [], options \\ []) do
-    Xandra.Cluster.execute(@pool_name, statement, params, options)
+    if Process.alive?(conn) do
+      GenServer.stop(conn)
+    end
   end
 
-  def execute!(statement, params \\ [], options \\ []) do
-    Xandra.Cluster.execute!(@pool_name, statement, params, options)
+  def to_keyword(%Postgrex.Result{columns: columns, rows: [rows]}) do
+    Enum.zip(columns, rows)
   end
 
-  def prepare(statement) do
-    Xandra.Cluster.prepare(@pool_name, statement)
-  end
-
-  def prepare!(statement) do
-    Xandra.Cluster.prepare!(@pool_name, statement)
-  end
-
-  @doc """
-  Cierra la conexión a ScyllaDB y elimina la referencia de persistent_term.
-  """
-  def stop do
-    Xandra.Cluster.stop(@pool_name)
+  def to_list(%Postgrex.Result{columns: columns, rows: rows}, fun) do
+    Enum.map(rows, fn row ->
+      Enum.zip(columns, row) |> fun.()
+    end)
   end
 end
