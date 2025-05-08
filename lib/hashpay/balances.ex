@@ -16,7 +16,7 @@ defmodule Hashpay.Balance do
   @trdb :balances
   import ThunderRAM, only: [key_merge: 2]
 
-  # @compile {:inline, [put: 4, incr: 4, get: 3, delete: 2]}
+  @compile {:inline, [put: 4, incr: 4, get: 3, delete: 2]}
 
   def new(account_id, name, amount \\ 0) do
     %__MODULE__{
@@ -35,8 +35,13 @@ defmodule Hashpay.Balance do
     ]
   end
 
+  def incr(tr, id, token, amount) do
+    ThunderRAM.incr(tr, @trdb, key_merge(id, token), {2, amount})
+  end
+
   def get(tr, id, token) do
     key = key_merge(id, token)
+
     case ThunderRAM.get(tr, @trdb, key) do
       {:ok, amount} -> amount
       _ -> 0
@@ -45,10 +50,6 @@ defmodule Hashpay.Balance do
 
   def put(tr, id, token, amount) do
     ThunderRAM.put(tr, @trdb, key_merge(id, token), amount)
-  end
-
-  def incr(tr, id, token, amount) do
-    ThunderRAM.counter(tr, @trdb, key_merge(id, token), {2, amount})
   end
 
   def delete(tr, id) do

@@ -7,21 +7,19 @@ defmodule Hashpay.Account.Command do
   def create(_ctx = %{db: db}, attrs) do
     account = Account.new(attrs)
 
-    Account.get(db, account.id)
-    |> case do
-      {:ok, _} ->
+    case Account.exists?(db, account.id) do
+      true ->
         {:error, "Account already exists"}
 
-      {:error, :not_found} ->
-        Account.put(db, account)
+      _false ->
+        Account.put_new(db, account)
     end
   end
 
   def change_pubkey(ctx = %{db: db}, %{"pubkey" => pubkey}) do
     pubkey = Base.decode64!(pubkey)
 
-    Account.get(db, ctx.sender.id)
-    |> case do
+    case Account.get(db, ctx.sender.id) do
       {:ok, account} ->
         Account.put(db, Map.put(account, :pubkey, pubkey))
 
@@ -36,8 +34,7 @@ defmodule Hashpay.Account.Command do
         {:error, "The name: #{name} is already taken"}
 
       true ->
-        Account.get(db, ctx.sender.id)
-        |> case do
+        case Account.get(db, ctx.sender.id) do
           {:ok, account} ->
             Account.put(db, Map.put(account, :name, name))
 
@@ -48,8 +45,7 @@ defmodule Hashpay.Account.Command do
   end
 
   def change_channel(ctx = %{db: db}, %{"channel" => channel}) do
-    Account.get(db, ctx.sender.id)
-    |> case do
+    case Account.get(db, ctx.sender.id) do
       {:ok, account} ->
         Account.put(db, Map.put(account, :channel, channel))
 
@@ -59,8 +55,7 @@ defmodule Hashpay.Account.Command do
   end
 
   def delete(ctx = %{db: db}) do
-    Account.get(db, ctx.sender.id)
-    |> case do
+    case Account.get(db, ctx.sender.id) do
       {:ok, %{id: account_id}} ->
         Account.delete(db, account_id)
 
@@ -70,8 +65,7 @@ defmodule Hashpay.Account.Command do
   end
 
   def verify(ctx = %{db: db}, %{"level" => level}) do
-    Account.get(db, ctx.sender.id)
-    |> case do
+    case Account.get(db, ctx.sender.id) do
       {:ok, account} ->
         Account.put(db, Map.put(account, :verified, level))
 

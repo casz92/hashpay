@@ -3,8 +3,10 @@ defmodule Hashpay.Currency.Command do
   alias Hashpay.Balance
   alias Hashpay.Currency
 
+  @default_currency Application.compile_env(:hashpay, :default_currency)
+
   def create(
-        %{db: db, conn: conn, sender: %{id: sender_id}},
+        %{db: db, sender: %{id: sender_id}},
         attrs = %{"id" => currency_id, "name" => name}
       ) do
     cond do
@@ -14,20 +16,17 @@ defmodule Hashpay.Currency.Command do
       not Currency.match_name?(name) ->
         {:error, "Invalid name"}
 
-      Currency.exists?(conn, currency_id) ->
+      Currency.exists?(db, currency_id) ->
         {:error, "Currency already exists"}
 
       true ->
         cost = Variable.get_currency_creation_cost()
 
-        case Balance.get(conn, sender_id, currency_id) do
-          {:ok, amount} when amount > cost ->
+        case Balance.get(db, sender_id, @default_currency) do
+          amount when amount > cost ->
             currency = Currency.new(attrs)
             Balance.incr(db, sender_id, name, -cost)
             Currency.put(db, currency)
-
-          {:error, :not_found} ->
-            {:ok, :not_found}
 
           _ ->
             {:error, "Insufficient balance"}
@@ -43,12 +42,12 @@ defmodule Hashpay.Currency.Command do
     Currency.merge(ctx.db, id, %{pubkey: pubkey})
   end
 
-  def update(ctx, id, attrs) do
+  def update(_ctx = %{db: db, sender: %{id: sender_id}}, attrs) do
     attrs =
       Map.take(attrs, ["picture", "decimals", "symbol", "max_supply"])
       |> MapUtil.to_atoms()
 
-    Currency.merge(ctx.db, id, attrs)
+    Currency.merge(db, sender_id, attrs)
   end
 
   def delete(ctx, id) do

@@ -37,6 +37,10 @@ defmodule Hashpay.Variable do
     :persistent_term.get({:var, "currency_creation_cost"}, 1000)
   end
 
+  def get_validator_creation_cost do
+    :persistent_term.get({:var, "validator_creation_cost"}, 1_000_000)
+  end
+
   def put_factor_a(tr, value) do
     :persistent_term.put({:var, "factor_a"}, value)
     ThunderRAM.put(tr, @trdb, "factor_a", value)
@@ -45,6 +49,31 @@ defmodule Hashpay.Variable do
   def put_factor_b(tr, value) do
     :persistent_term.put({:var, "factor_b"}, value)
     ThunderRAM.put(tr, @trdb, "factor_b", value)
+  end
+
+  def put_round_rewarded_base(tr, value) do
+    :persistent_term.put({:var, "round_rewarded_base"}, value)
+    ThunderRAM.put(tr, @trdb, "round_rewarded_base", value)
+  end
+
+  def put_round_rewarded_transactions(tr, value) do
+    :persistent_term.put({:var, "round_rewarded_transactions"}, value)
+    ThunderRAM.put(tr, @trdb, "round_rewarded_transactions", value)
+  end
+
+  def put_round_size_target(tr, value) do
+    :persistent_term.put({:var, "round_size_target"}, value)
+    ThunderRAM.put(tr, @trdb, "round_size_target", value)
+  end
+
+  def put_currency_creation_cost(tr, value) do
+    :persistent_term.put({:var, "currency_creation_cost"}, value)
+    ThunderRAM.put(tr, @trdb, "currency_creation_cost", value)
+  end
+
+  def put_validator_creation_cost(tr, value) do
+    :persistent_term.put({:var, "validator_creation_cost"}, value)
+    ThunderRAM.put(tr, @trdb, "validator_creation_cost", value)
   end
 
   def init(tr) do
@@ -59,7 +88,8 @@ defmodule Hashpay.Variable do
         ThunderRAM.put(tr, @trdb, "round_rewarded_base", 10)
         ThunderRAM.put(tr, @trdb, "round_rewarded_transactions", 0.1)
         ThunderRAM.put(tr, @trdb, "round_size_target", 0.05)
-        ThunderRAM.put(tr, @trdb, "currency_creation_cost", 1_000_000)
+        ThunderRAM.put(tr, @trdb, "currency_creation_cost", 1_000_000_000)
+        ThunderRAM.put(tr, @trdb, "validator_creation_cost", 5_000_000)
         ThunderRAM.sync(tr)
     end
 

@@ -55,6 +55,8 @@ defmodule Hashpay.Validator do
   @regex ~r/^v_[a-zA-Z0-9]*$/
   @trdb :validators
 
+  @compile {:inline, [put: 2, put_new: 2, exists?: 2, delete: 2, total: 1]}
+
   def generate_id(pubkey) do
     <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
@@ -118,10 +120,25 @@ defmodule Hashpay.Validator do
     ThunderRAM.exists?(tr, @trdb, id)
   end
 
+  def merge(tr, id, attrs) do
+    case get(tr, id) do
+      {:ok, validator} ->
+        validator = Map.merge(validator, struct(__MODULE__, attrs))
+        ThunderRAM.put(tr, @trdb, validator.id, validator)
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
   def delete(tr, id) do
     validator = get(tr, id)
     ThunderRAM.delete(tr, @trdb, id)
     ValidatorName.delete(tr, validator.name)
+  end
+
+  def total(tr) do
+    ThunderRAM.count(tr, @trdb)
   end
 end
 

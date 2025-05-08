@@ -125,11 +125,9 @@ defmodule Hashpay.MixProject do
       {:event_bus, "~> 1.7.0"},
       # eredis - Cliente para Redis
       {:eredis, "~> 1.7"},
-
       {:blake3, "~> 1.0"},
       {:merkerl, "~> 1.1"},
       {:rocksdb, "~> 1.9"}
-
     ]
   end
 end

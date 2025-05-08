@@ -136,7 +136,6 @@ defmodule Hashpay.Application do
         LotteryTicket
       ]
     )
-    |> IO.inspect()
 
     tr = ThunderRAM.get_tr(:blockchain)
     Variable.init(tr)

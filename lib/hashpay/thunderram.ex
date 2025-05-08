@@ -193,7 +193,7 @@ defmodule ThunderRAM do
     end
   end
 
-  def counter(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}) do
+  def incr(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}) do
     %{handle: handle, ets: ets} = Map.get(tables, name)
     result = :ets.update_counter(ets, key, {elem, amount}, {key, amount})
     :rocksdb.batch_put(batch, handle, key, term_to_binary(result))
