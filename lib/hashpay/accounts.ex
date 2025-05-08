@@ -29,7 +29,7 @@ defmodule Hashpay.Account do
   def dbopts do
     [
       name: :accounts,
-      cf: ~c"accounts",
+      handle: ~c"accounts",
       exp: true
     ]
   end
@@ -91,7 +91,7 @@ defmodule Hashpay.AccountName do
   def dbopts do
     [
       name: @trdb,
-      cf: ~c"account_names_idx",
+      handle: ~c"account_names_idx",
       exp: false
     ]
   end

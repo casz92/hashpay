@@ -137,6 +137,9 @@ defmodule Hashpay.Application do
       ]
     )
     |> IO.inspect()
+
+    tr = ThunderRAM.get_tr(:blockchain)
+    Variable.init(tr)
   end
 
   defp setup_events do

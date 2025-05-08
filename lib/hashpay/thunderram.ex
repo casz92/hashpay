@@ -26,21 +26,31 @@ defmodule ThunderRAM do
     {db, cfs} =
       if File.exists?(filename) do
         cfs_opts = [
-          {~c"default", []} | Enum.map(modules, &{String.to_charlist(&1.dbopts()[:cf]), []})
+          {~c"default", []} | Enum.map(modules, &{&1.dbopts()[:handle], []})
         ]
 
-        {:ok, db, cfs} = :rocksdb.open(filename, [create_if_missing: true], cfs_opts)
+        {:ok, db, [_default_cf | cfs]} =
+          :rocksdb.open(filename, [create_if_missing: true], cfs_opts)
+
         {db, cfs}
       else
-        {:ok, db} = :rocksdb.open(filename, create_if_missing: true)
+        try do
+          {:ok, db, _default_cf} =
+            :rocksdb.open(filename, [create_if_missing: true], [{~c"default", []}])
 
-        cfs =
-          Enum.map(modules, fn mod ->
-            {:ok, handle} = :rocksdb.create_column_family(db, mod.dbopts()[:handle], [])
-            handle
-          end)
+          cfs =
+            Enum.map(modules, fn mod ->
+              IO.inspect(mod)
+              {:ok, handle} = :rocksdb.create_column_family(db, mod.dbopts()[:handle], [])
+              handle
+            end)
 
-        {db, cfs}
+          {db, cfs}
+        rescue
+          e ->
+            File.rm_rf!(filename)
+            reraise e, __STACKTRACE__
+        end
       end
 
     tables =
@@ -112,15 +122,17 @@ defmodule ThunderRAM do
 
     try do
       do_foreach(iter, fun, direction)
-    after
-      :rocksdb.iterator_close(iter)
+    rescue
+      e ->
+        :rocksdb.iterator_close(iter)
+        reraise e, __STACKTRACE__
     end
   end
 
   defp do_foreach(iter, fun, direction \\ :next) do
     case :rocksdb.iterator_move(iter, direction) do
       {:ok, key, value} ->
-        fun.(key, value)
+        fun.(key, binary_to_term(value))
         do_foreach(iter, fun)
 
       _ ->
@@ -138,15 +150,17 @@ defmodule ThunderRAM do
 
     try do
       do_while(iter, fun, direction)
-    after
-      :rocksdb.iterator_close(iter)
+    rescue
+      e ->
+        :rocksdb.iterator_close(iter)
+        reraise e, __STACKTRACE__
     end
   end
 
   defp do_while(iter, fun, direction \\ :next) do
     case :rocksdb.iterator_move(iter, direction) do
       {:ok, key, value} ->
-        if fun.(key, value) == :next do
+        if fun.(key, binary_to_term(value)) == :next do
           do_while(iter, fun)
         else
           :rocksdb.iterator_close(iter)
@@ -163,7 +177,7 @@ defmodule ThunderRAM do
         :ets.insert(ets, {key, value})
         :rocksdb.batch_put(batch, handle, key, term_to_binary(value))
 
-      %{handle: handle, ets: ets, exp: true} ->
+      %{handle: handle, ets: ets} ->
         :ets.insert(ets, {key, value})
         :rocksdb.batch_put(batch, handle, key, term_to_binary(value))
         Cache.put(name, key)
