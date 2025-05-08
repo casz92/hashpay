@@ -9,9 +9,6 @@ defmodule Hashpay.Member do
   - creation: Marca de tiempo de creación del miembro
   - meta: Metadatos adicionales del miembro
   """
-  alias Hashpay.DB
-  @behaviour Hashpay.MigrationBehaviour
-
   @enforce_keys [
     :group_id,
     :member_id,
@@ -34,48 +31,8 @@ defmodule Hashpay.Member do
           meta: map() | nil
         }
 
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS members (
-      group_id text,
-      member_id text,
-      role text,
-      creation bigint,
-      meta map<text, text>,
-      PRIMARY KEY (group_id, member_id)
-    ) with transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
-
-    indices = [
-      "CREATE INDEX IF NOT EXISTS ON members (member_id);"
-    ]
-
-    Enum.each(indices, fn index ->
-      DB.execute!(conn, index)
-    end)
-  end
-
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS members;"
-    DB.execute(conn, statement)
-  end
-
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
-  end
+  @trdb :members
+  import ThunderRAM, only: [key_merge: 2]
 
   def new(group_id, member_id, role, meta \\ %{}) do
     %__MODULE__{
@@ -87,103 +44,31 @@ defmodule Hashpay.Member do
     }
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO members (group_id, member_id, role, creation, meta)
-    VALUES (?, ?, ?, ?, ?);
-    """
-
-    delete_statement = "DELETE FROM members WHERE group_id = ? AND member_id = ?;"
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-
-    :persistent_term.put({:stmt, "members_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "members_delete"}, delete_prepared)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"members",
+      exp: true
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "members_insert"})
+  def put(tr, %__MODULE__{group_id: group_id, member_id: member_id} = member) do
+    key = key_merge(group_id, member_id)
+    ThunderRAM.put(tr, @trdb, key, member)
   end
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "members_delete"})
+  def get(tr, group_id, member_id) do
+    key = key_merge(group_id, member_id)
+    ThunderRAM.get(tr, @trdb, key)
   end
 
-  def batch_save(batch, member) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      member.group_id,
-      member.member_id,
-      member.role,
-      member.creation,
-      member.meta
-    ])
+  def exists?(tr, group_id, member_id) do
+    key = key_merge(group_id, member_id)
+    ThunderRAM.exists?(tr, @trdb, key)
   end
 
-  def batch_delete(batch, group_id, member_id) do
-    Xandra.Batch.add(batch, delete_prepared(), [group_id, member_id])
-  end
-
-  @spec exists?(pid(), String.t(), String.t()) :: boolean()
-  def exists?(conn, group_id, member_id) do
-    statement = "SELECT member_id FROM members WHERE group_id = ? AND member_id = ? LIMIT 1"
-    params = [{"text", group_id}, {"text", member_id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [] -> false
-          _ -> true
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def exists?(conn, group_id, member_id, role) do
-    statement =
-      "SELECT member_id FROM members WHERE group_id = ? AND member_id = ? AND role = ? LIMIT 1"
-
-    params = [{"text", group_id}, {"text", member_id}, {"text", role}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [] -> false
-          _ -> true
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get(conn, group_id, member_id) do
-    statement = "SELECT * FROM members WHERE group_id = ? AND member_id = ?;"
-    params = [{"text", group_id}, {"text", member_id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def row_to_struct(row) do
-    # Crear la estructura con los campos deserializados
-    struct!(__MODULE__, %{
-      group_id: row["group_id"],
-      member_id: row["member_id"],
-      role: row["role"],
-      creation: row["creation"],
-      meta: row["meta"]
-    })
+  def delete(tr, group_id, member_id) do
+    key = key_merge(group_id, member_id)
+    ThunderRAM.delete(tr, @trdb, key)
   end
 end

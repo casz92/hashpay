@@ -19,11 +19,7 @@ defmodule Hashpay.Block do
   - status: Estado del bloque (entero)
   - vsn: Versión del formato de bloque
   """
-
-  use Hashpay.Serializable
-  @behaviour Hashpay.MigrationBehaviour
-
-  alias Hashpay.{DB}
+  @trdb :blocks
 
   @enforce_keys [
     :creator,
@@ -226,170 +222,27 @@ defmodule Hashpay.Block do
 
   # Sobrescribir funciones específicas del behaviour Storable
 
-  @doc """
-  Sobrescribe la función create_table para usar una clave primaria compuesta.
-  """
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS blocks (
-      id bigint,
-      creator text,
-      channel text,
-      height bigint,
-      round bigint,
-      hash blob,
-      filehash blob,
-      prev blob,
-      signature blob,
-      timestamp bigint,
-      count int,
-      rejected int,
-      size int,
-      status int,
-      vsn int,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute!(conn, statement)
-
-    # Crear índices para búsquedas eficientes
-    indices = [
-      "CREATE INDEX IF NOT EXISTS ON blocks (hash);",
-      "CREATE INDEX IF NOT EXISTS ON blocks (creator);",
-      "CREATE INDEX IF NOT EXISTS ON blocks (channel);",
-      "CREATE INDEX IF NOT EXISTS ON blocks (round);"
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"blocks",
+      exp: true
     ]
-
-    Enum.each(indices, fn index ->
-      DB.execute!(conn, index)
-    end)
   end
 
-  @impl true
-  def up(conn) do
-    create_table(conn)
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  @impl true
-  def down(conn) do
-    drop_table(conn)
+  def put(tr, %__MODULE__{} = block) do
+    ThunderRAM.put(tr, @trdb, block.id, block)
   end
 
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS blocks;"
-    DB.execute!(conn, statement)
-  end
-
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO blocks (id, creator, channel, height, round, hash, filehash, prev, signature, timestamp, count, rejected, size, status, vsn)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-
-    :persistent_term.put({:stmt, "blocks_insert"}, insert_prepared)
-  end
-
-  def insert_prepared do
-    :persistent_term.get({:stmt, "blocks_insert"})
-  end
-
-  def batch_save(batch, block) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      block.id,
-      block.creator,
-      block.channel,
-      block.height,
-      block.round,
-      block.hash,
-      block.filehash,
-      block.prev,
-      block.signature,
-      block.timestamp,
-      block.count,
-      block.rejected,
-      block.size,
-      block.status,
-      block.vsn
-    ])
-  end
-
-  def get(conn, channel, height) do
-    statement = "SELECT * FROM blocks WHERE channel = ? AND height = ?;"
-    params = [{"text", channel}, {"bigint", height}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get_by_hash(conn, hash) do
-    statement = "SELECT * FROM blocks WHERE hash = ? ALLOW FILTERING;"
-    params = [{"blob", hash}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get_last(conn, channel, limit \\ 1) do
-    statement = "SELECT * FROM blocks WHERE channel = ? ORDER BY height DESC LIMIT ?;"
-    params = [{"text", channel}, {"int", limit}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def row_to_struct(row) do
-    # Crear la estructura con los campos deserializados
-    struct!(__MODULE__, %{
-      id: row["id"],
-      creator: row["creator"],
-      channel: row["channel"],
-      height: row["height"],
-      round: row["round"],
-      hash: row["hash"],
-      filehash: row["filehash"],
-      prev: row["prev"],
-      signature: row["signature"],
-      timestamp: row["timestamp"],
-      count: row["count"],
-      rejected: row["rejected"],
-      size: row["size"],
-      status: row["status"],
-      vsn: row["vsn"]
-    })
+  def delete(tr, %__MODULE__{} = block) do
+    ThunderRAM.delete(tr, @trdb, block.id)
   end
 end

@@ -77,15 +77,17 @@ defmodule Hashpay.Cache do
   """
   @spec cleanup(older_than :: integer()) :: count :: integer()
   def cleanup(older_than) do
+    tr = ThunderRAM.get_tr(:blockchain)
+
     :ets.foldl(
       fn {id, type, readed_at}, acc ->
         Logger.info("Removing #{inspect(id)} of type #{inspect(type)} at #{inspect(readed_at)}")
 
         if readed_at < older_than do
           case type do
-            :account -> Account.remove(id)
-            :merchant -> Merchant.remove(id)
-            :balance -> Balance.remove(id)
+            :accounts -> Account.delete(tr, id)
+            :merchants -> Merchant.delete(tr, id)
+            :balances -> Balance.delete(tr, id)
             _ -> remove(id)
           end
 

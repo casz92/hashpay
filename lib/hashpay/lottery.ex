@@ -6,6 +6,7 @@ defmodule Hashpay.Lottery do
   - description: Descripción de la lotería
   - prize_amount: Monto del premio de la lotería
   - prize_currency: Moneda del premio de la lotería
+  - issuer: Emisor de la lotería
   - start_date: Fecha de inicio de la lotería
   - end_date: Fecha de finalización de la lotería
   - status: Estado de la lotería (0: active, 1: pending_to_claim, 2: finished, 3: cancelled)
@@ -20,99 +21,112 @@ defmodule Hashpay.Lottery do
   - verification_url: URL de verificación de la lotería
   - creation: Marca de tiempo de creación de la lotería
   """
-  @behaviour Hashpay.MigrationBehaviour
-  alias Hashpay.DB
-  require :crypto
+  @prefix "lt_"
+  @regex ~r/^lt_[a-zA-Z0-9]$/
+  @trdb :lotteries
 
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS lotteries (
-      id text,
-      description text,
-      prize_amount bigint,
-      prize_currency text,
-      start_date bigint,
-      end_date bigint,
-      status int,
-      match_digits int,
-      number_winner text,
-      channel text,
-      claim_deadline bigint,
-      has_accumulated boolean,
-      min_participants int,
-      ticket_price bigint,
-      max_winners int,
-      verification_url text,
-      creation bigint,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
+  defstruct [
+    :id,
+    :description,
+    :issuer,
+    :prize_amount,
+    :prize_currency,
+    :start_date,
+    :end_date,
+    :status,
+    :match_digits,
+    :number_winner,
+    :channel,
+    :claim_deadline,
+    :has_accumulated,
+    :min_participants,
+    :ticket_price,
+    :max_winners,
+    :verification_url,
+    creation: 0
+  ]
 
-    DB.execute(conn, statement)
+  def match?(id) do
+    Regex.match?(@regex, id)
   end
 
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS lotteries;"
-    DB.execute(conn, statement)
+  def generate_id(account_id, hash) do
+    hash =
+      [account_id, hash]
+      |> Enum.join("|")
+      |> :crypto.hash(:sha256)
+      |> :binary.part(0, 16)
+      |> Base62.encode()
+
+    IO.iodata_to_binary([@prefix, hash])
   end
 
-  @impl true
-  def up(conn) do
-    create_table(conn)
+  def new(
+        account_id,
+        hash,
+        attrs = %{
+          "channel" => channel,
+          "prize_amount" => prize_amount,
+          "prize_currency" => prize_currency,
+          "start_date" => start_date,
+          "end_date" => end_date,
+          "ticket_price" => ticket_price
+        }
+      ) do
+    %__MODULE__{
+      id: generate_id(account_id, hash),
+      description: Map.get(attrs, "description", ""),
+      issuer: account_id,
+      prize_amount: prize_amount,
+      prize_currency: prize_currency,
+      start_date: start_date,
+      end_date: end_date,
+      status: Map.get(attrs, "status", 0),
+      match_digits: Map.get(attrs, "match_digits", 3),
+      number_winner: Map.get(attrs, "number_winner", "3"),
+      channel: channel,
+      claim_deadline: Map.get(attrs, "claim_deadline", 0),
+      has_accumulated: Map.get(attrs, "has_accumulated", false),
+      min_participants: Map.get(attrs, "min_participants", 0),
+      ticket_price: ticket_price,
+      max_winners: Map.get(attrs, "max_winners", 1),
+      verification_url: Map.get(attrs, "verification_url", ""),
+      creation: Hashpay.get_last_round_id()
+    }
   end
 
-  @impl true
-  def down(conn) do
-    drop_table(conn)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"lotteries",
+      exp: true
+    ]
   end
 
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO lotteries (id, description, prize_amount, prize_currency, start_date, end_date, status, match_digits, number_winner, channel, claim_deadline, has_accumulated, min_participants, ticket_price, max_winners, verification_url, creation)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-
-    :persistent_term.put({:stmt, "lotteries_insert"}, insert_prepared)
+  def put(tr, %__MODULE__{} = lottery) do
+    ThunderRAM.put(tr, @trdb, lottery.id, lottery)
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "lotteries_insert"})
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 
-  def batch_save(batch, lottery) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      lottery.id,
-      lottery.description,
-      lottery.prize_amount,
-      lottery.prize_currency,
-      lottery.start_date,
-      lottery.end_date,
-      lottery.status,
-      lottery.match_digits,
-      lottery.number_winner,
-      lottery.channel,
-      lottery.claim_deadline,
-      lottery.has_accumulated,
-      lottery.min_participants,
-      lottery.ticket_price,
-      lottery.max_winners,
-      lottery.verification_url,
-      lottery.creation
-    ])
+  def delete(tr, %__MODULE__{} = lottery) do
+    ThunderRAM.delete(tr, @trdb, lottery.id)
   end
 
-  def cancel(conn, id) do
-    statement = "UPDATE lotteries SET status = 3 WHERE id = ?;"
-    params = [{"text", id}]
+  def change_status(tr, id, status) do
+    case ThunderRAM.get(tr, @trdb, id) do
+      {:ok, lottery} ->
+        ThunderRAM.put(tr, @trdb, lottery.id, %{lottery | status: status})
 
-    DB.execute(conn, statement, params)
+      _ ->
+        {:error, :not_found}
+    end
   end
 
   # def generate_ticket(id, secret) do

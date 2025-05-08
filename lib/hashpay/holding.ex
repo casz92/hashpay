@@ -10,8 +10,6 @@ defmodule Hashpay.Holding do
   - apr: Tasa de rendimiento anual del holding
   - creation: Marca de tiempo de creación del holding
   """
-  alias Hashpay.DB
-  @behaviour Hashpay.MigrationBehaviour
   @type t :: %__MODULE__{
           id: String.t(),
           account_id: String.t(),
@@ -31,41 +29,11 @@ defmodule Hashpay.Holding do
   ]
 
   @prefix "ho_"
+  @regex ~r/^ho_[a-zA-Z0-9]*$/
+  @trdb :holdings
 
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS holdings (
-        id text,
-        account_id text,
-        currency_id text,
-        amount bigint,
-        apr double,
-        creation bigint,
-        PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
-  end
-
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS holdings;"
-    DB.execute(conn, statement)
+  def match?(id) do
+    Regex.match?(@regex, id)
   end
 
   def generate_id(account_id, currency_id, apr) do
@@ -90,98 +58,23 @@ defmodule Hashpay.Holding do
     }
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO holdings (id, account_id, currency_id, amount, apr, creation)
-    VALUES (?, ?, ?, ?, ?, ?);
-    """
-
-    delete_statement = "DELETE FROM holdings WHERE id = ?;"
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-
-    :persistent_term.put({:stmt, "holdings_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "holdings_delete"}, delete_prepared)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"holdings",
+      exp: true
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "holdings_insert"})
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "holdings_delete"})
+  def put(tr, %__MODULE__{} = holding) do
+    ThunderRAM.put(tr, @trdb, holding.id, holding)
   end
 
-  def batch_save(batch, holding) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      holding.id,
-      holding.account_id,
-      holding.currency_id,
-      holding.amount,
-      holding.apr,
-      holding.creation
-    ])
-  end
-
-  def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [id])
-  end
-
-  def batch_update_fields(batch, map, id) do
-    set_clause =
-      Enum.map_join(map, ", ", fn {field, value} ->
-        "#{field} = :#{value}"
-      end)
-
-    statement = """
-    UPDATE holdings
-    SET #{set_clause}
-    WHERE id = :id;
-    """
-
-    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
-  end
-
-  def get(conn, id) do
-    statement = "SELECT * FROM holdings WHERE id = ?;"
-    params = [{"text", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get_by_account(conn, account_id) do
-    statement = "SELECT * FROM holdings WHERE account_id = ?;"
-    params = [{"text", account_id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        structs = Enum.map(page, &row_to_struct/1)
-        {:ok, structs}
-
-      error ->
-        error
-    end
-  end
-
-  def row_to_struct(row) do
-    struct!(__MODULE__, %{
-      id: row["id"],
-      account_id: row["account_id"],
-      currency_id: row["currency_id"],
-      amount: row["amount"],
-      apr: row["apr"],
-      creation: row["creation"]
-    })
+  def delete(tr, %__MODULE__{} = holding) do
+    ThunderRAM.delete(tr, @trdb, holding.id)
   end
 end

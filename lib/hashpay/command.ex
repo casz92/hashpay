@@ -31,7 +31,6 @@ defmodule Hashpay.Command do
   ]
 
   alias Hashpay.Validator
-  alias Hashpay.DB
   alias Hashpay.Merchant
   alias Hashpay.Account
   alias Hashpay.Function.Context
@@ -77,20 +76,20 @@ defmodule Hashpay.Command do
     Cafezinho.Impl.verify(command.signature, command.hash, public_key)
   end
 
-  @spec fetch_sender(pid(), String.t()) ::
+  @spec fetch_sender(ThunderRAM.t(), String.t()) ::
           {:ok, Account.t() | Merchant.t()} | {:error, :not_found} | {:error, String.t()}
-  def fetch_sender(conn, id) do
+  def fetch_sender(tr, id) do
     <<prefix::binary-3, _rest::binary>> = id
 
     case prefix do
       "ac_" ->
-        Account.fetch(conn, id)
+        Account.get(tr, id)
 
       "v_" ->
-        Validator.fetch(conn, id)
+        Validator.get(tr, id)
 
       "mc_" ->
-        Merchant.fetch(conn, id)
+        Merchant.get(tr, id)
 
       _ ->
         {:error, "Invalid sender"}
@@ -142,9 +141,9 @@ defmodule Hashpay.Command do
   def handle(command) do
     case Functions.get(command.fun) do
       {:ok, function} ->
-        conn = DB.get_conn()
+        tr = ThunderRAM.get_tr(:blockchain)
 
-        case fetch_sender(conn, command.from) do
+        case fetch_sender(tr, command.from) do
           {:ok, sender} ->
             cond do
               sender.channel != @channel && sender.channel != @default_channel ->

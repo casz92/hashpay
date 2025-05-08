@@ -1,8 +1,4 @@
 defmodule Hashpay.Balance do
-  alias Hashpay.DB
-  alias Hashpay.Hits
-  @behaviour Hashpay.MigrationBehaviour
-
   @type t :: %__MODULE__{
           id: String.t(),
           name: String.t(),
@@ -18,32 +14,9 @@ defmodule Hashpay.Balance do
   ]
 
   @trdb :balances
+  import ThunderRAM, only: [key_merge: 2]
 
-  # @compile {:inline, [put: 1, fetch: 1, delete: 1]}
-
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS balances (
-      id text,
-      name text,
-      amount decimal,
-      updated bigint,
-      PRIMARY KEY (id, name)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute!(conn, statement)
-  end
+  # @compile {:inline, [put: 4, incr: 4, get: 3, delete: 2]}
 
   def new(account_id, name, amount \\ 0) do
     %__MODULE__{
@@ -54,61 +27,31 @@ defmodule Hashpay.Balance do
     }
   end
 
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS balances;"
-    DB.execute(conn, statement)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"balances",
+      exp: true
+    ]
   end
 
-  @impl true
-  def init(_conn) do
-    :ok
+  def get(tr, id, token) do
+    key = key_merge(id, token)
+    case ThunderRAM.get(tr, @trdb, key) do
+      {:ok, amount} -> amount
+      _ -> 0
+    end
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO balances (id, name, amount, updated)
-    VALUES (?, ?, ?, ?);
-    """
-
-    update_statement = """
-    UPDATE balances
-    SET amount = amount + ?, updated = ?
-    WHERE id = ? and name = ?;
-    """
-
-    delete_statement = """
-    DELETE FROM balances WHERE id = ?;
-    """
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    update_prepared = DB.prepare!(conn, update_statement)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-
-    :persistent_term.put({:stmt, "balances_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "balances_update"}, update_prepared)
-    :persistent_term.put({:stmt, "balances_delete"}, delete_prepared)
+  def put(tr, id, token, amount) do
+    ThunderRAM.put(tr, @trdb, key_merge(id, token), amount)
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "balances_insert"})
+  def incr(tr, id, token, amount) do
+    ThunderRAM.counter(tr, @trdb, key_merge(id, token), {2, amount})
   end
 
-  def update_prepared do
-    :persistent_term.get({:stmt, "balances_update"})
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
-
-  def delete_prepared do
-    :persistent_term.get({:stmt, "balances_delete"})
-  end
-
-
-
-  # def row_to_struct(row) do
-  #   struct!(__MODULE__, %{
-  #     id: row["id"],
-  #     name: row["name"],
-  #     amount: row["amount"],
-  #     updated: row["updated"]
-  #   })
-  # end
 end

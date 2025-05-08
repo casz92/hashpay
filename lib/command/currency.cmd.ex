@@ -4,7 +4,7 @@ defmodule Hashpay.Currency.Command do
   alias Hashpay.Currency
 
   def create(
-        %{batch: batch, conn: conn, sender: %{id: sender_id}},
+        %{db: db, conn: conn, sender: %{id: sender_id}},
         attrs = %{"id" => currency_id, "name" => name}
       ) do
     cond do
@@ -19,12 +19,12 @@ defmodule Hashpay.Currency.Command do
 
       true ->
         cost = Variable.get_currency_creation_cost()
-        currency = Currency.new(attrs)
 
-        case Balance.fetch(conn, sender_id, currency_id) do
+        case Balance.get(conn, sender_id, currency_id) do
           {:ok, amount} when amount > cost ->
-            Balance.incr(batch, sender_id, name, -cost)
-            Currency.batch_save(batch, currency)
+            currency = Currency.new(attrs)
+            Balance.incr(db, sender_id, name, -cost)
+            Currency.put(db, currency)
 
           {:error, :not_found} ->
             {:ok, :not_found}
@@ -36,19 +36,22 @@ defmodule Hashpay.Currency.Command do
   end
 
   def change_name(ctx, id, name) do
-    Currency.batch_update_fields(ctx.batch, %{name: name}, id)
+    Currency.merge(ctx.db, id, %{name: name})
   end
 
   def change_pubkey(ctx, id, pubkey) do
-    Currency.batch_update_fields(ctx.batch, %{pubkey: pubkey}, id)
+    Currency.merge(ctx.db, id, %{pubkey: pubkey})
   end
 
   def update(ctx, id, attrs) do
-    attrs = Map.take(attrs, ["picture", "decimals", "symbol", "max_supply"])
-    Currency.batch_update_fields(ctx.batch, attrs, id)
+    attrs =
+      Map.take(attrs, ["picture", "decimals", "symbol", "max_supply"])
+      |> MapUtil.to_atoms()
+
+    Currency.merge(ctx.db, id, attrs)
   end
 
   def delete(ctx, id) do
-    Currency.batch_delete(ctx.batch, id)
+    Currency.delete(ctx.db, id)
   end
 end

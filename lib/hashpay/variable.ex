@@ -7,9 +7,9 @@ defmodule Hashpay.Variable do
   - round_rewarded_transactions: Cantidad de Hashpay recompensada por transacción
   - round_size_target: Cantidad de penalización por tamaño de ronda
   """
-  alias Hashpay.Variable
-  alias Hashpay.DB
-  @behaviour Hashpay.MigrationBehaviour
+  @trdb :variables
+
+  @compile {:inline, [put: 3, get: 2, delete: 2]}
 
   defstruct [:key, :value]
 
@@ -37,105 +37,58 @@ defmodule Hashpay.Variable do
     :persistent_term.get({:var, "currency_creation_cost"}, 1000)
   end
 
-  def create_table(conn, keyspace \\ nil) do
-    if keyspace do
-      DB.use_keyspace(conn, keyspace)
+  def put_factor_a(tr, value) do
+    :persistent_term.put({:var, "factor_a"}, value)
+    ThunderRAM.put(tr, @trdb, "factor_a", value)
+  end
+
+  def put_factor_b(tr, value) do
+    :persistent_term.put({:var, "factor_b"}, value)
+    ThunderRAM.put(tr, @trdb, "factor_b", value)
+  end
+
+  def init(tr) do
+    case get(tr, "factor_a") do
+      {:ok, _value} ->
+        :ignore
+
+      _ ->
+        tr = ThunderRAM.new_batch(tr)
+        ThunderRAM.put(tr, @trdb, "factor_a", 1)
+        ThunderRAM.put(tr, @trdb, "factor_b", 0)
+        ThunderRAM.put(tr, @trdb, "round_rewarded_base", 10)
+        ThunderRAM.put(tr, @trdb, "round_rewarded_transactions", 0.1)
+        ThunderRAM.put(tr, @trdb, "round_size_target", 0.05)
+        ThunderRAM.put(tr, @trdb, "currency_creation_cost", 1_000_000)
+        ThunderRAM.sync(tr)
     end
 
-    statement = """
-    CREATE TABLE IF NOT EXISTS variables (
-      key text,
-      value bytea,
-      PRIMARY KEY (key)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
+    load_all(tr)
   end
 
-  def drop_table(conn, keyspace \\ nil) do
-    if keyspace do
-      DB.use_keyspace(conn, keyspace)
-    end
-
-    statement = "DROP TABLE IF EXISTS variables;"
-    DB.execute(conn, statement)
+  def load_all(tr) do
+    ThunderRAM.foreach(tr, @trdb, fn key, value ->
+      :persistent_term.put({:var, key}, value)
+    end)
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO variables (key, value)
-    VALUES (?, ?);
-    """
-
-    delete_statement = "DELETE FROM variables WHERE key = ?;"
-
-    DB.prepare!(conn, "variables_insert", insert_prepared)
-    DB.prepare!(conn, "variables_delete", delete_statement)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"variables",
+      exp: false
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "variables_insert"})
+  def get(tr, key) do
+    ThunderRAM.get(tr, @trdb, key)
   end
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "variables_delete"})
+  def put(tr, key, value) do
+    ThunderRAM.put(tr, @trdb, key, value)
   end
 
-  def batch_save(batch, variable) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      variable.key,
-      variable.value |> :erlang.term_to_binary()
-    ])
-  end
-
-  def batch_delete(batch, key) do
-    Xandra.Batch.add(batch, delete_prepared(), [key])
-    PostgrexBatch.add(batch, "variables_delete", [key])
-  end
-
-  @impl true
-  def init(conn) do
-    load_all(conn)
-    prepare_statements!(conn)
-  end
-
-  def load_all(conn) do
-    statement = "SELECT key, value FROM variables;"
-
-    case DB.execute(conn, statement) do
-      {:ok, %Postgrex.Result{columns: columns, rows: rows}} ->
-        Enum.each(rows, fn row ->
-          row = Enum.zip(columns, row)
-          key = row["key"]
-          value = row["value"] |> :erlang.binary_to_term()
-          :persistent_term.put({:var, key}, value)
-        end)
-
-      error ->
-        error
-    end
-  end
-
-  @impl true
-  def up(conn) do
-    create_table(conn)
-    prepare_statements!(conn)
-
-    batch =
-      Xandra.Batch.new(:logged)
-      |> batch_save(%Variable{key: "factor_a", value: 1})
-      |> batch_save(%Variable{key: "factor_b", value: 0})
-      |> batch_save(%Variable{key: "round_rewarded_base", value: 10})
-      |> batch_save(%Variable{key: "round_rewarded_transactions", value: 0.1})
-      |> batch_save(%Variable{key: "round_size_target", value: 0.05})
-      |> batch_save(%Variable{key: "currency_creation_cost", value: 1_000_000})
-
-    DB.execute!(conn, batch)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
+  def delete(tr, key) do
+    ThunderRAM.delete(tr, @trdb, key)
   end
 end

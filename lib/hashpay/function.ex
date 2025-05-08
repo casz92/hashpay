@@ -39,7 +39,7 @@ end
 
 defmodule Hashpay.Function.Context do
   alias Hashpay.Merchant
-  alias Hashpay.{Command, Account, Block, Round, DB}
+  alias Hashpay.{Command, Account, Block, Round}
   alias Hashpay.Function.Context
 
   defstruct [
@@ -63,16 +63,15 @@ defmodule Hashpay.Function.Context do
         }
 
   def new(cmd, fun, sender) do
-    new(DB.get_conn(), cmd, fun, sender)
+    new(ThunderRAM.get_tr(:blockchain), cmd, fun, sender)
   end
 
-  def new(conn, cmd, fun, sender) do
+  def new(tr = %ThunderRAM{}, cmd, fun, sender) do
     %Context{
       cmd: cmd,
       fun: fun,
       sender: sender,
-      db: conn,
-      batch: DB.get_batch()
+      db: tr
     }
   end
 end

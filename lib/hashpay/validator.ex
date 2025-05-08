@@ -17,10 +17,6 @@ defmodule Hashpay.Validator do
   - creation: Marca de tiempo de creación del validador
   - updated: Marca de tiempo de última actualización del validador
   """
-  alias Hashpay.DB
-
-  @behaviour Hashpay.MigrationBehaviour
-
   @type t :: %__MODULE__{
           id: String.t(),
           hostname: String.t(),
@@ -53,73 +49,11 @@ defmodule Hashpay.Validator do
     :updated
   ]
 
+  alias Hashpay.ValidatorName
+
   @prefix "v_"
-
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS validators (
-      id text,
-      hostname text,
-      port int,
-      name text,
-      channel text,
-      pubkey blob,
-      picture text,
-      factor_a double,
-      factor_b int,
-      active boolean,
-      failures int,
-      creation bigint,
-      updated bigint,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
-
-    indices = [
-      "CREATE INDEX IF NOT EXISTS ON validators (hostname);"
-    ]
-
-    Enum.each(indices, fn index ->
-      DB.execute!(conn, index)
-    end)
-  end
-
-  @impl true
-  def init(conn) do
-    create_ets_table()
-    load_all(conn)
-    prepare_statements!(conn)
-  end
-
-  def create_ets_table do
-    :ets.new(:validators, [:ordered_set, :public, :named_table])
-  end
-
-  def load_all(conn) do
-    statement = "SELECT * FROM validators;"
-
-    case DB.execute(conn, statement) do
-      {:ok, %Xandra.Page{} = page} ->
-        Enum.each(page, fn row ->
-          :ets.insert(:validators, {row["id"], row_to_struct(row)})
-        end)
-
-      error ->
-        error
-    end
-  end
+  @regex ~r/^v_[a-zA-Z0-9]*$/
+  @trdb :validators
 
   def generate_id(pubkey) do
     <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
@@ -127,181 +61,90 @@ defmodule Hashpay.Validator do
   end
 
   def match?(id) do
-    Regex.match?(~r/^v_[a-zA-Z0-9]*$/, id)
+    Regex.match?(@regex, id)
   end
 
-  def new(attrs) do
+  def new(
+        attrs = %{
+          "pubkey" => pubkey,
+          "hostname" => hostname,
+          "port" => port,
+          "name" => name,
+          "channel" => channel
+        }
+      ) do
+    pubkey = Base.decode64!(pubkey)
     last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
-      id: generate_id(attrs[:pubkey]),
-      hostname: attrs[:hostname],
-      port: attrs[:port],
-      name: attrs[:name],
-      channel: attrs[:channel],
-      pubkey: attrs[:pubkey],
-      picture: attrs[:picture],
-      factor_a: attrs[:factor_a],
-      factor_b: attrs[:factor_b],
-      active: attrs[:active],
-      failures: attrs[:failures],
+      id: generate_id(pubkey),
+      hostname: hostname,
+      port: port,
+      name: name,
+      channel: channel,
+      pubkey: pubkey,
+      picture: Map.get(attrs, "picture", nil),
+      factor_a: Map.get(attrs, "factor_a", 1),
+      factor_b: Map.get(attrs, "factor_b", 0),
+      active: Map.get(attrs, "active", false),
+      failures: 0,
       creation: last_round_id,
       updated: last_round_id
     }
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO validators (id, hostname, port, name, channel, pubkey, picture, factor_a, factor_b, active, failures, creation, updated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    delete_statement = "DELETE FROM validators WHERE id = ?;"
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-
-    :persistent_term.put({:stmt, "validators_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "validators_delete"}, delete_prepared)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"validators",
+      exp: true
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "validators_insert"})
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "validators_delete"})
+  def put(tr, %__MODULE__{} = validator) do
+    ThunderRAM.put(tr, @trdb, validator.id, validator)
   end
 
-  def batch_save(batch, validator) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      validator.id,
-      validator.hostname,
-      validator.port,
-      validator.name,
-      validator.channel,
-      validator.pubkey,
-      validator.picture,
-      validator.factor_a,
-      validator.factor_b,
-      validator.active,
-      validator.failures,
-      validator.creation,
-      validator.updated
-    ])
+  def put_new(tr, %__MODULE__{} = validator) do
+    ThunderRAM.put(tr, @trdb, validator.id, validator)
+    ValidatorName.put(tr, validator.name, validator.id)
   end
 
-  def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [id])
+  def exists?(tr, id) do
+    ThunderRAM.exists?(tr, @trdb, id)
   end
 
-  def batch_update_fields(batch, map, id) do
-    set_clause =
-      Enum.map_join(map, ", ", fn {field, value} ->
-        "#{field} = :#{value}"
-      end)
+  def delete(tr, id) do
+    validator = get(tr, id)
+    ThunderRAM.delete(tr, @trdb, id)
+    ValidatorName.delete(tr, validator.name)
+  end
+end
 
-    statement = """
-    UPDATE validators
-    SET #{set_clause}
-    WHERE id = :id;
-    """
+defmodule Hashpay.ValidatorName do
+  @trdb :validator_names_idx
 
-    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"validator_names_idx",
+      exp: false
+    ]
   end
 
-  def get(conn, id) do
-    statement = "SELECT * FROM validators WHERE id = ?;"
-    params = [{"text", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
+  def put(tr, name, id) do
+    ThunderRAM.put(tr, @trdb, name, id)
   end
 
-  def fetch(id) do
-    case :ets.lookup(:validators, id) do
-      [{^id, validator}] -> {:ok, validator}
-      [] -> {:error, :not_found}
-    end
+  def exists?(tr, name) do
+    ThunderRAM.exists?(tr, @trdb, name)
   end
 
-  def fetch(conn, id) do
-    case fetch(id) do
-      {:ok, validator} -> {:ok, validator}
-      {:error, :not_found} -> get(conn, id)
-    end
-  end
-
-  def fetch_all do
-    :ets.tab2list(:validators)
-  end
-
-  def remove(id) do
-    :ets.delete(:validators, id)
-  end
-
-  def remove(conn, id) do
-    :ets.delete(:validators, id)
-    delete(conn, id)
-  end
-
-  def delete(conn, id) do
-    statement = "DELETE FROM validators WHERE id = ?;"
-    params = [{"text", id}]
-
-    DB.execute(conn, statement, params)
-  end
-
-  def put(%__MODULE__{} = validator) do
-    :ets.insert(:validators, {validator.id, validator})
-  end
-
-  def exists?(conn, id) do
-    statement = "SELECT id FROM validators WHERE id = ? LIMIT 1"
-    params = [{"text", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [] -> false
-          _ -> true
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS validators;"
-    DB.execute!(conn, statement)
-  end
-
-  def row_to_struct(row) do
-    # Crear la estructura con los campos deserializados
-    struct!(__MODULE__, %{
-      id: row["id"],
-      hostname: row["hostname"],
-      port: row["port"],
-      name: row["name"],
-      channel: row["channel"],
-      pubkey: row["pubkey"],
-      picture: row["picture"],
-      factor_a: row["factor_a"],
-      factor_b: row["factor_b"],
-      active: row["active"],
-      failures: row["failures"],
-      creation: row["creation"],
-      updated: row["updated"]
-    })
+  def delete(tr, name) do
+    ThunderRAM.delete(tr, @trdb, name)
   end
 end

@@ -13,8 +13,6 @@ defmodule Hashpay.Plan do
   - creation: Marca de tiempo de creación del plan
   """
 
-  alias Hashpay.DB
-  @behaviour Hashpay.MigrationBehaviour
   @type t :: %__MODULE__{
           id: String.t(),
           merchant_id: String.t(),
@@ -40,44 +38,11 @@ defmodule Hashpay.Plan do
   ]
 
   @prefix "plan_"
+  @regex ~r/^plan_[a-zA-Z0-9]*$/
+  @trdb :plans
 
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS plans (
-      id text,
-      merchant_id text,
-      currency_id text,
-      amount bigint,
-      status int,
-      period int,
-      due_date bigint,
-      description text,
-      creation bigint,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
-  end
-
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS plans;"
-    DB.execute(conn, statement)
+  def match?(id) do
+    Regex.match?(@regex, id)
   end
 
   def generate_id(merchant_id, currency_id, amount, period) do
@@ -109,111 +74,27 @@ defmodule Hashpay.Plan do
     }
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO plans (id, merchant_id, currency_id, amount, status, period, due_date, description, creation)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    delete_statement = "DELETE FROM plans WHERE id = ?;"
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-
-    :persistent_term.put({:stmt, "plans_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "plans_delete"}, delete_prepared)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"plans",
+      exp: true
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "plans_insert"})
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "plans_delete"})
+  def put(tr, %__MODULE__{} = plan) do
+    ThunderRAM.put(tr, @trdb, plan.id, plan)
   end
 
-  def batch_save(batch, plan) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      plan.id,
-      plan.merchant_id,
-      plan.currency_id,
-      plan.amount,
-      plan.status,
-      plan.period,
-      plan.due_date,
-      plan.description,
-      plan.creation
-    ])
+  def delete(tr, %__MODULE__{} = plan) do
+    ThunderRAM.delete(tr, @trdb, plan.id)
   end
 
-  def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [id])
-  end
-
-  def batch_update_fields(batch, map, id) do
-    set_clause =
-      Enum.map_join(map, ", ", fn {field, value} ->
-        "#{field} = :#{value}"
-      end)
-
-    statement = """
-    UPDATE plans
-    SET #{set_clause}
-    WHERE id = :id;
-    """
-
-    Xandra.Batch.add(batch, statement, Map.put(map, :id, id))
-  end
-
-  def delete(conn, id) do
-    statement = "DELETE FROM plans WHERE id = ?;"
-    params = [{"text", id}]
-
-    DB.execute(conn, statement, params)
-  end
-
-  def get(conn, id) do
-    statement = "SELECT * FROM plans WHERE id = ?;"
-    params = [{"text", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get_by_merchant(conn, merchant_id) do
-    statement = "SELECT * FROM plans WHERE merchant_id = ?;"
-    params = [{"text", merchant_id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        structs = Enum.map(page, &row_to_struct/1)
-        {:ok, structs}
-
-      error ->
-        error
-    end
-  end
-
-  def row_to_struct(row) do
-    struct!(__MODULE__, %{
-      id: row["id"],
-      merchant_id: row["merchant_id"],
-      currency_id: row["currency_id"],
-      amount: row["amount"],
-      status: row["status"],
-      period: row["period"],
-      due_date: row["due_date"],
-      description: row["description"],
-      creation: row["creation"]
-    })
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 end

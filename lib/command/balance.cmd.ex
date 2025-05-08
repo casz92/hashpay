@@ -31,7 +31,7 @@ defmodule Hashpay.Balance.Command do
         {:error, "Invalid transfer"}
 
       true ->
-        case Balance.fetch(ctx.conn, from, currency_id) do
+        case Balance.get(ctx.conn, from, currency_id) do
           {:ok, from_balance} when from_balance >= amount ->
             Balance.incr(ctx.batch, to, currency_id, amount)
             Balance.incr(ctx.batch, from, currency_id, -amount)

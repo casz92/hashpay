@@ -75,7 +75,7 @@ defmodule Hashpay.Application do
       {:ok, pid} ->
         # conn = DB.get_conn()
         setup_events()
-        load_objects()
+        load_db()
         Logger.info("Hashpay v#{version} started with #{threads} threads ✨")
         {:ok, pid}
 
@@ -90,44 +90,53 @@ defmodule Hashpay.Application do
     :persistent_term.put(:thread_counter, ref)
   end
 
-  defp load_objects do
+  alias Hashpay.{
+    Variable,
+    Currency,
+    Validator,
+    ValidatorName,
+    Account,
+    AccountName,
+    Merchant,
+    MerchantName,
+    Balance,
+    Member,
+    Plan,
+    Payday,
+    Paystream,
+    Holding,
+    Lottery,
+    LotteryTicket,
+    Round,
+    Block
+  }
+
+  defp load_db do
     ThunderRAM.new(
       name: :blockchain,
-      db: ~c"blockchain",
-      cfs: [
-        "variables",
-        "rounds",
-        "blocks",
-        "accounts",
-        "balances",
-        "currencies",
-        "merchants",
-        "members",
-        "plans",
-        "paydays",
-        "paystreams",
-        "holdings",
-        "lotteries",
-        "lottery_tickets"
+      filename: ~c"priv/data/blockchain",
+      modules: [
+        Variable,
+        Round,
+        Block,
+        Account,
+        AccountName,
+        Balance,
+        Currency,
+        Validator,
+        ValidatorName,
+        Merchant,
+        MerchantName,
+        Member,
+        Plan,
+        Payday,
+        Paystream,
+        Holding,
+        Lottery,
+        LotteryTicket
       ]
     )
     |> IO.inspect()
-
-    # Round.init(conn)
-    # Block.init(conn)
-    # Variable.init(conn)
-    # Currency.init(conn)
-    # Validator.init(conn)
-    # Account.init(conn)
-    # Merchant.init(conn)
-    # Balance.init(conn)
-    # Member.init(conn)
-    # Plan.init(conn)
-    # Payday.init(conn)
-    # Paystream.init(conn)
-    # Holding.init(conn)
-    # Lottery.init(conn)
-    # LotteryTicket.init(conn)
   end
 
   defp setup_events do

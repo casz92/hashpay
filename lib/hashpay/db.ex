@@ -68,8 +68,8 @@ defmodule Hashpay.DB do
     :persistent_term.get(:batch, nil)
   end
 
-  def new_batch(type \\ :unlogged) do
-    batch = PostgrexBatch.new(type)
+  def new_batch do
+    batch = PostgrexBatch.new()
     :persistent_term.put(:batch, batch)
     batch
   end

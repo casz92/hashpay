@@ -9,9 +9,6 @@ defmodule Hashpay.LotteryTicket do
   - creation: Marca de tiempo de creación del ticket
   """
 
-  alias Hashpay.DB
-  @behaviour Hashpay.MigrationBehaviour
-
   @type t :: %__MODULE__{
           id: String.t(),
           lottery_id: String.t(),
@@ -28,43 +25,9 @@ defmodule Hashpay.LotteryTicket do
     creation: 0
   ]
 
-  @prefix "lt_"
-  @regex ~r/^lt_[a-zA-Z0-9]$/
-
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS lottery_tickets (
-      id text,
-      lottery_id text,
-      account_id text,
-      number text,
-      creation bigint,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
-  end
-
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS lottery_tickets;"
-    DB.execute(conn, statement)
-  end
+  @prefix "ltt_"
+  @regex ~r/^ltt_[a-zA-Z0-9]$/
+  @trdb :lottery_tickets
 
   def generate_id(lottery_id, account_id, number) do
     hash =
@@ -96,62 +59,23 @@ defmodule Hashpay.LotteryTicket do
     }
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO lottery_tickets (id, lottery_id, account_id, number, creation)
-    VALUES (?, ?, ?, ?, ?);
-    """
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-
-    :persistent_term.put({:stmt, "lottery_tickets_insert"}, insert_prepared)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"lottery_tickets",
+      exp: true
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "lottery_tickets_insert"})
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  def batch_save(batch, ticket) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      ticket.id,
-      ticket.lottery_id,
-      ticket.account_id,
-      ticket.number,
-      ticket.creation
-    ])
+  def put(tr, %__MODULE__{} = ticket) do
+    ThunderRAM.put(tr, @trdb, ticket.id, ticket)
   end
 
-  def get(conn, id) do
-    statement = "SELECT * FROM lottery_tickets WHERE id = ?;"
-    params = [{"text", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def delete_all(conn, lottery_id) do
-    statement = "DELETE FROM lottery_tickets WHERE lottery_id = ?;"
-    params = [{"text", lottery_id}]
-
-    DB.execute(conn, statement, params)
-  end
-
-  def row_to_struct(row) do
-    struct!(__MODULE__, %{
-      id: row["id"],
-      lottery_id: row["lottery_id"],
-      account_id: row["account_id"],
-      number: row["number"],
-      creation: row["creation"]
-    })
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 end

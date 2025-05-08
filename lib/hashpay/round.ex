@@ -18,13 +18,10 @@ defmodule Hashpay.Round do
   - blocks: Lista de hashes de bloques incluidos en la ronda
   - vsn: Versión del formato de la ronda
   """
-  @behaviour Hashpay.MigrationBehaviour
-
-  use Hashpay.Serializable
-
-  alias Hashpay.DB
   alias Hashpay.Variable
   alias Hashpay.Round
+
+  @trdb :rounds
 
   @enforce_keys [
     :id,
@@ -235,145 +232,27 @@ defmodule Hashpay.Round do
 
   # Sobrescribir funciones específicas del behaviour Storable
 
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS rounds (
-      id bigint,
-      hash blob,
-      prev blob,
-      creator text,
-      signature blob,
-      reward bigint,
-      count int,
-      txs int,
-      size int,
-      status tinyint,
-      timestamp bigint,
-      blocks frozen<list<blob>>,
-      vsn int,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute!(conn, statement)
-
-    # Crear índices para búsquedas eficientes
-    indices = [
-      "CREATE INDEX IF NOT EXISTS rounds_hash_idx ON rounds (hash);",
-      "CREATE INDEX IF NOT EXISTS rounds_creator_idx ON rounds (creator);"
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"rounds",
+      exp: true
     ]
-
-    Enum.each(indices, fn index ->
-      DB.execute!(conn, index)
-    end)
   end
 
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS rounds;"
-    DB.execute!(conn, statement)
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  @impl true
-  def down(conn) do
-    drop_table(conn)
+  def put(tr, %__MODULE__{} = round) do
+    ThunderRAM.put(tr, @trdb, round.id, round)
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO rounds (id, hash, prev, creator, signature, reward, count, txs, size, status, timestamp, blocks, vsn)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-
-    :persistent_term.put({:stmt, "rounds_insert"}, insert_prepared)
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "rounds_insert"})
-  end
-
-  def batch_save(batch, round) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      round.id,
-      round.hash,
-      round.prev,
-      round.creator,
-      round.signature,
-      round.reward,
-      round.count,
-      round.txs,
-      round.size,
-      round.status,
-      round.timestamp,
-      round.blocks,
-      round.vsn
-    ])
-  end
-
-  def get(conn, id) do
-    statement = "SELECT * FROM rounds WHERE id = ?;"
-    params = [{"bigint", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get_last(conn, limit \\ 1) do
-    statement = "SELECT * FROM rounds ORDER BY id DESC LIMIT ?;"
-    params = [{"int", limit}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  @doc """
-  Sobrescribe la función row_to_struct para manejar la deserialización de bloques.
-  """
-  def row_to_struct(row) do
-    # Crear la estructura con los campos deserializados
-    struct!(__MODULE__, %{
-      id: row["id"],
-      hash: row["hash"],
-      prev: row["prev"],
-      creator: row["creator"],
-      signature: row["signature"],
-      reward: row["reward"],
-      count: row["count"],
-      txs: row["txs"],
-      size: row["size"],
-      status: row["status"],
-      timestamp: row["timestamp"],
-      blocks: row["blocks"],
-      vsn: row["vsn"]
-    })
+  def delete(tr, %__MODULE__{} = round) do
+    ThunderRAM.delete(tr, @trdb, round.id)
   end
 end

@@ -11,9 +11,6 @@ defmodule Hashpay.Paystream do
   - last_paystream: Último paystream procesado
   - creation: Marca de tiempo de creación del paystream
   """
-  alias Hashpay.DB
-  @behaviour Hashpay.MigrationBehaviour
-
   @type t :: %__MODULE__{
           id: String.t(),
           account_id: String.t(),
@@ -35,42 +32,11 @@ defmodule Hashpay.Paystream do
   ]
 
   @prefix "pstr_"
+  @regex ~r/^pstr_[a-zA-Z0-9]*$/
+  @trdb :paystreams
 
-  @impl true
-  def up(conn) do
-    create_table(conn)
-  end
-
-  @impl true
-  def down(conn) do
-    drop_table(conn)
-  end
-
-  @impl true
-  def init(conn) do
-    prepare_statements!(conn)
-  end
-
-  def create_table(conn) do
-    statement = """
-    CREATE TABLE IF NOT EXISTS paystreams (
-      id text,
-      account_id text,
-      currency_id text,
-      merchant_id text,
-      amount bigint,
-      last_paystream bigint,
-      creation bigint,
-      PRIMARY KEY (id)
-    ) WITH transactions = {'enabled': 'true'};
-    """
-
-    DB.execute(conn, statement)
-  end
-
-  def drop_table(conn) do
-    statement = "DROP TABLE IF EXISTS paystreams;"
-    DB.execute(conn, statement)
+  def match?(id) do
+    Regex.match?(@regex, id)
   end
 
   def generate_id(account_id, currency_id, merchant_id) do
@@ -84,12 +50,16 @@ defmodule Hashpay.Paystream do
     IO.iodata_to_binary([@prefix, hash])
   end
 
-  def new(attrs) do
-    account_id = attrs[:account_id]
-    currency_id = attrs[:currency_id]
-    merchant_id = attrs[:merchant_id]
-    amount = attrs[:amount]
-    last_paystream = attrs[:last_paystream]
+  def new(
+        _attrs = %{
+          "account_id" => account_id,
+          "currency_id" => currency_id,
+          "merchant_id" => merchant_id,
+          "amount" => amount,
+          "last_paystream" => last_paystream
+        }
+      ) do
+    last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
       id: generate_id(account_id, currency_id, merchant_id),
@@ -98,113 +68,27 @@ defmodule Hashpay.Paystream do
       merchant_id: merchant_id,
       amount: amount,
       last_paystream: last_paystream,
-      creation: Hashpay.get_last_round_id()
+      creation: last_round_id
     }
   end
 
-  def prepare_statements!(conn) do
-    insert_prepared = """
-    INSERT INTO paystreams (id, account_id, currency_id, merchant_id, amount, last_paystream, creation)
-    VALUES (?, ?, ?, ?, ?, ?, ?);
-    """
-
-    delete_statement = "DELETE FROM paystreams WHERE id = ?;"
-
-    incr_statement =
-      "UPDATE paystreams SET amount = ?, last_paystream = ? WHERE id = ?;"
-
-    insert_prepared = DB.prepare!(conn, insert_prepared)
-    delete_prepared = DB.prepare!(conn, delete_statement)
-    incr_prepared = DB.prepare!(conn, incr_statement)
-
-    :persistent_term.put({:stmt, "paystreams_insert"}, insert_prepared)
-    :persistent_term.put({:stmt, "paystreams_delete"}, delete_prepared)
-    :persistent_term.put({:stmt, "paystreams_incr"}, incr_prepared)
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"paystreams",
+      exp: true
+    ]
   end
 
-  def insert_prepared do
-    :persistent_term.get({:stmt, "paystreams_insert"})
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
-  def delete_prepared do
-    :persistent_term.get({:stmt, "paystreams_delete"})
+  def put(tr, %__MODULE__{} = paystream) do
+    ThunderRAM.put(tr, @trdb, paystream.id, paystream)
   end
 
-  def incr_prepared do
-    :persistent_term.get({:stmt, "paystreams_incr"})
-  end
-
-  def batch_save(batch, paystream) do
-    Xandra.Batch.add(batch, insert_prepared(), [
-      paystream.id,
-      paystream.account_id,
-      paystream.currency_id,
-      paystream.merchant_id,
-      paystream.amount,
-      paystream.last_paystream,
-      paystream.creation
-    ])
-  end
-
-  def batch_delete(batch, id) do
-    Xandra.Batch.add(batch, delete_prepared(), [id])
-  end
-
-  def batch_incr(batch, id, amount, last_paystream) do
-    Xandra.Batch.add(batch, incr_prepared(), [
-      amount,
-      id,
-      last_paystream
-    ])
-  end
-
-  def delete(conn, id) do
-    statement = "DELETE FROM paystreams WHERE id = ?;"
-    params = [{"text", id}]
-
-    DB.execute(conn, statement, params)
-  end
-
-  def get(conn, id) do
-    statement = "SELECT * FROM paystreams WHERE id = ?;"
-    params = [{"text", id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        case Enum.to_list(page) do
-          [row] -> {:ok, row_to_struct(row)}
-          [] -> {:error, :not_found}
-          _ -> {:error, :multiple_results}
-        end
-
-      error ->
-        error
-    end
-  end
-
-  def get_by_account(conn, account_id) do
-    statement = "SELECT * FROM paystreams WHERE account_id = ?;"
-    params = [{"text", account_id}]
-
-    case DB.execute(conn, statement, params) do
-      {:ok, %Xandra.Page{} = page} ->
-        structs = Enum.map(page, &row_to_struct/1)
-        {:ok, structs}
-
-      error ->
-        error
-    end
-  end
-
-  def row_to_struct(row) do
-    struct!(__MODULE__, %{
-      id: row["id"],
-      account_id: row["account_id"],
-      currency_id: row["currency_id"],
-      merchant_id: row["merchant_id"],
-      amount: row["amount"],
-      last_paystream: row["last_paystream"],
-      creation: row["creation"]
-    })
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 end
