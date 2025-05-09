@@ -13,16 +13,27 @@ defmodule Hashpay.Validator.Command do
       {:error, :not_found} ->
         cost = Variable.get_validator_creation_cost() * (Validator.total(db) + 1)
 
-        case Balance.get(db, sender_id, @default_currency) do
-          amount when amount > cost ->
+        case Balance.incr_non_zero(db, sender_id, @default_currency, -cost) do
+          :ok ->
             validator = Validator.new(attrs)
-            Balance.incr(db, sender_id, cost, -cost)
             Validator.put_new(db, validator)
 
-          _ ->
-            {:error, "Insufficient balance"}
+          error ->
+            error
         end
     end
+  end
+
+  def change_name(ctx = %{db: db}, name) do
+    Validator.merge(db, ctx.sender.id, %{name: name})
+  end
+
+  def change_pubkey(ctx = %{db: db}, pubkey) do
+    Validator.merge(db, ctx.sender.id, %{pubkey: pubkey})
+  end
+
+  def change_channel(ctx = %{db: db}, channel) do
+    Validator.merge(db, ctx.sender.id, %{channel: channel})
   end
 
   def update(_ctx = %{db: db, sender: %{id: sender_id}}, attrs) do
@@ -33,14 +44,27 @@ defmodule Hashpay.Validator.Command do
     Validator.merge(db, sender_id, attrs)
   end
 
-  def withdraw(ctx = %{db: db}, amount) do
-    case Validator.get(db, ctx.sender.id) do
-      {:ok, validator} ->
-        Balance.incr(db, ctx.sender.id, amount, amount)
-        Validator.put(db, Map.put(validator, :balance, validator.balance - amount))
+  def withdraw(_ctx = %{db: db, sender: %{id: validator_id}}, %{
+        "amount" => amount,
+        "currency" => currency,
+        "to" => to
+      }) do
+    cost = compute_withdrawal_fee(amount)
 
-      {:error, :not_found} ->
-        {:error, "Validator not found"}
+    case Balance.incr_non_zero(db, validator_id, @default_currency, -cost) do
+      :ok ->
+        case Balance.incr_non_zero(db, validator_id, currency, -amount) do
+          :ok ->
+            Balance.incr(db, to, currency, amount)
+
+          error ->
+            # rollback
+            Balance.incr(db, validator_id, @default_currency, cost)
+            error
+        end
+
+      error ->
+        error
     end
   end
 
@@ -51,6 +75,13 @@ defmodule Hashpay.Validator.Command do
 
       {:error, :not_found} ->
         {:error, "Validator not found"}
+    end
+  end
+
+  defp compute_withdrawal_fee(amount) do
+    case Variable.get_validator_withdrawal_fee() do
+      0 -> amount
+      fee -> trunc(amount * fee)
     end
   end
 end

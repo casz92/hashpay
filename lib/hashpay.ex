@@ -20,6 +20,8 @@ defmodule Hashpay do
           | :lottery_ticket
           | :paystream
 
+  @compile {:inline, [hash: 1]}
+
   def gen_id do
     time =
       :os.system_time(:millisecond)
@@ -53,6 +55,10 @@ defmodule Hashpay do
     {address, pubkey, privkey}
   end
 
+  def hash(data) do
+    Blake3.hash(data)
+  end
+
   def gen_address_from_pubkey(pubkey) do
     time =
       :os.system_time(:millisecond)
@@ -80,7 +86,19 @@ defmodule Hashpay do
   Calcula la tarifa de una transacción basado en sus atributos.
   Devuelve un entero representa las tarifas de la transacción.
   """
-  def calc_fee(amount, a, b) do
-    trunc(amount * a * Variable.get_factor_a() + b + Variable.get_factor_b())
+  def compute_fees(amount) do
+    trunc(amount * Variable.get_factor_a() + Variable.get_factor_b())
+  end
+
+  def compute_fees(amount, 1, b) do
+    trunc(amount + b)
+  end
+
+  def compute_fees(amount, a, 0) do
+    trunc(amount * a)
+  end
+
+  def compute_fees(amount, a, b) do
+    trunc(amount * a + b)
   end
 end

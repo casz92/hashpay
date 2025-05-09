@@ -139,7 +139,7 @@ defmodule Hashpay.Functions do
       id: 301,
       name: "changeNameValidator",
       mod: Hashpay.Validator.Commands,
-      fun: :update,
+      fun: :change_name,
       auth_type: 1,
       thread: :type_and_args
     },
@@ -147,14 +147,14 @@ defmodule Hashpay.Functions do
       id: 302,
       name: "changePubkeyValidator",
       mod: Hashpay.Validator.Commands,
-      fun: :update,
+      fun: :change_pubkey,
       auth_type: 1
     },
     %Function{
       id: 303,
       name: "changeChannelValidator",
       mod: Hashpay.Validator.Commands,
-      fun: :update,
+      fun: :change_channel,
       auth_type: 1
     },
     %Function{
@@ -166,25 +166,18 @@ defmodule Hashpay.Functions do
     },
     %Function{
       id: 305,
-      name: "putPropsValidator",
-      mod: Hashpay.Validator.Commands,
-      fun: :put_props,
-      auth_type: 1
-    },
-    %Function{
-      id: 306,
-      name: "deletePropsValidator",
-      mod: Hashpay.Validator.Commands,
-      fun: :delete_props,
-      auth_type: 1
-    },
-    %Function{
-      id: 307,
       name: "deleteValidator",
       mod: Hashpay.Validator.Commands,
       fun: :delete,
       auth_type: 1,
       thread: :type_and_args
+    },
+    %Function{
+      id: 306,
+      name: "withdrawValidator",
+      mod: Hashpay.Validator.Commands,
+      fun: :withdraw,
+      auth_type: 1
     },
     %Function{
       id: 400,
@@ -198,7 +191,7 @@ defmodule Hashpay.Functions do
       id: 401,
       name: "changeNameMerchant",
       mod: Hashpay.Merchant.Commands,
-      fun: :update,
+      fun: :change_name,
       auth_type: 1,
       thread: :type_and_args
     },
@@ -206,14 +199,14 @@ defmodule Hashpay.Functions do
       id: 402,
       name: "changePubkeyMerchant",
       mod: Hashpay.Merchant.Commands,
-      fun: :update,
+      fun: :change_pubkey,
       auth_type: 1
     },
     %Function{
       id: 403,
       name: "changeChannelMerchant",
       mod: Hashpay.Merchant.Commands,
-      fun: :update,
+      fun: :change_channel,
       auth_type: 1
     },
     %Function{
@@ -225,20 +218,6 @@ defmodule Hashpay.Functions do
     },
     %Function{
       id: 405,
-      name: "putPropsMerchant",
-      mod: Hashpay.Merchant.Commands,
-      fun: :put_props,
-      auth_type: 1
-    },
-    %Function{
-      id: 406,
-      name: "deletePropsMerchant",
-      mod: Hashpay.Merchant.Commands,
-      fun: :delete_props,
-      auth_type: 1
-    },
-    %Function{
-      id: 407,
       name: "deleteMerchant",
       mod: Hashpay.Merchant.Commands,
       fun: :delete,
@@ -298,9 +277,9 @@ defmodule Hashpay.Functions do
     },
     %Function{
       id: 800,
-      name: "createPayday",
+      name: "claimPayday",
       mod: Hashpay.Payday.Commands,
-      fun: :create,
+      fun: :claim,
       auth_type: 1
     },
     %Function{
@@ -312,9 +291,9 @@ defmodule Hashpay.Functions do
     },
     %Function{
       id: 900,
-      name: "createPaystream",
+      name: "sendPaystream",
       mod: Hashpay.Paystream.Commands,
-      fun: :create,
+      fun: :send,
       auth_type: 1
     },
     %Function{
@@ -354,12 +333,28 @@ defmodule Hashpay.Functions do
       thread: :type
     },
     %Function{
-      id: 1100,
+      id: 1101,
       name: "deleteVariable",
       mod: Hashpay.Variable.Commands,
       fun: :delete,
       auth_type: 1,
       thread: :type
+    },
+    %Function{
+      id: 1200,
+      name: "setProp",
+      mod: Hashpay.Property.Commands,
+      fun: :set,
+      auth_type: 1,
+      thread: :args
+    },
+    %Function{
+      id: 1201,
+      name: "deleteProp",
+      mod: Hashpay.Property.Commands,
+      fun: :delete,
+      auth_type: 1,
+      thread: :args
     }
   ]
 

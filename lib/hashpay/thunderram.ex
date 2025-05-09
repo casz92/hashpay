@@ -16,7 +16,14 @@ defmodule ThunderRAM do
   defstruct [:batch, :db, :name, :tables]
   @key :thunderram
 
+  @open_options [
+    create_if_missing: true,
+    merge_operator: :erlang_merge_operator
+  ]
+
   alias Hashpay.Cache
+
+  @compile {:inline, [exists?: 3, get: 3, put: 4, incr: 4, delete: 3, count: 2]}
 
   def new(opts) do
     name = Keyword.get(opts, :name) || raise("`name` is required")
@@ -30,17 +37,16 @@ defmodule ThunderRAM do
         ]
 
         {:ok, db, [_default_cf | cfs]} =
-          :rocksdb.open(filename, [create_if_missing: true], cfs_opts)
+          :rocksdb.open(filename, @open_options, cfs_opts)
 
         {db, cfs}
       else
         try do
           {:ok, db, _default_cf} =
-            :rocksdb.open(filename, [create_if_missing: true], [{~c"default", []}])
+            :rocksdb.open(filename, @open_options, [{~c"default", []}])
 
           cfs =
             Enum.map(modules, fn mod ->
-              IO.inspect(mod)
               {:ok, handle} = :rocksdb.create_column_family(db, mod.dbopts()[:handle], [])
               handle
             end)
@@ -110,6 +116,17 @@ defmodule ThunderRAM do
     end
   end
 
+  @doc """
+  Usage:
+    tr = ThunderRAM.get_tr(:blockchain)
+    opts = [
+      init: {:seek, "ac_"},
+      direction: :next
+    ]
+    ThunderRAM.foreach(tr, :accounts, fn key, value ->
+      # do something with key and value
+    end, opts)
+  """
   def foreach(%ThunderRAM{db: db, tables: tables}, name, fun, opts \\ []) do
     %{handle: handle} = Map.get(tables, name)
     # init: <<>> | :last
@@ -197,6 +214,36 @@ defmodule ThunderRAM do
     %{handle: handle, ets: ets} = Map.get(tables, name)
     result = :ets.update_counter(ets, key, {elem, amount}, {key, amount})
     :rocksdb.batch_put(batch, handle, key, term_to_binary(result))
+
+    :rocksdb.batch_merge(batch, key, term_to_binary({:int_add, amount}), [])
+  end
+
+  def incr_non_zero(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, neg_amount}) do
+    %{handle: handle, ets: ets} = Map.get(tables, name)
+
+    case :ets.update_counter(ets, key, {elem, neg_amount}, {key, neg_amount}) do
+      result when 0 > result ->
+        :ets.update_counter(ets, key, {elem, abs(neg_amount)})
+        {:error, "Insufficient balance"}
+
+      result ->
+        :rocksdb.batch_merge(batch, handle, key, term_to_binary({:int_add, neg_amount}))
+        {:ok, result}
+    end
+  end
+
+  def incr_limit(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}, limit) do
+    %{handle: handle, ets: ets} = Map.get(tables, name)
+
+    case :ets.update_counter(ets, key, {elem, amount}, {key, amount}) do
+      result when result > limit ->
+        :ets.update_counter(ets, key, {elem, -amount})
+        {:error, "Limit exceeded"}
+
+      result ->
+        :rocksdb.batch_merge(batch, handle, key, term_to_binary({:int_add, amount}))
+        {:ok, result}
+    end
   end
 
   def count(%ThunderRAM{db: db, tables: tables}, name) do

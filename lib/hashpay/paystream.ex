@@ -7,7 +7,6 @@ defmodule Hashpay.Paystream do
   - account_id: Identificador de la cuenta a la que pertenece el paystream
   - currency_id: Identificador de la moneda del paystream
   - merchant_id: Identificador del comercio al que pertenece el paystream
-  - amount: Cantidad de la moneda en el paystream
   - last_paystream: Último paystream procesado
   - creation: Marca de tiempo de creación del paystream
   """
@@ -16,7 +15,6 @@ defmodule Hashpay.Paystream do
           account_id: String.t(),
           currency_id: String.t(),
           merchant_id: String.t(),
-          amount: non_neg_integer(),
           last_paystream: non_neg_integer(),
           creation: non_neg_integer()
         }
@@ -26,7 +24,6 @@ defmodule Hashpay.Paystream do
     :account_id,
     :currency_id,
     :merchant_id,
-    :amount,
     :last_paystream,
     creation: 0
   ]
@@ -42,8 +39,8 @@ defmodule Hashpay.Paystream do
   def generate_id(account_id, currency_id, merchant_id) do
     hash =
       [account_id, currency_id, merchant_id]
-      |> Enum.join("|")
-      |> :crypto.hash(:sha256)
+      |> IO.iodata_to_binary()
+      |> Hashpay.hash()
       |> :binary.part(0, 20)
       |> Base62.encode()
 
@@ -51,13 +48,9 @@ defmodule Hashpay.Paystream do
   end
 
   def new(
-        _attrs = %{
-          "account_id" => account_id,
-          "currency_id" => currency_id,
-          "merchant_id" => merchant_id,
-          "amount" => amount,
-          "last_paystream" => last_paystream
-        }
+        account_id,
+        currency_id,
+        merchant_id
       ) do
     last_round_id = Hashpay.get_last_round_id()
 
@@ -66,8 +59,7 @@ defmodule Hashpay.Paystream do
       account_id: account_id,
       currency_id: currency_id,
       merchant_id: merchant_id,
-      amount: amount,
-      last_paystream: last_paystream,
+      last_paystream: 0,
       creation: last_round_id
     }
   end

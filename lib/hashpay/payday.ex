@@ -6,7 +6,6 @@ defmodule Hashpay.Payday do
   - id: Identificador único del payday
   - account_id: Identificador de la cuenta a la que pertenece el payday
   - currency_id: Identificador de la moneda del payday
-  - amount: Cantidad de la moneda en el payday
   - last_payday: Último payday procesado
   - last_withdraw: Último retiro procesado
   - creation: Marca de tiempo de creación del payday
@@ -16,7 +15,6 @@ defmodule Hashpay.Payday do
           id: String.t(),
           account_id: String.t(),
           currency_id: String.t(),
-          amount: non_neg_integer(),
           last_payday: non_neg_integer(),
           last_withdraw: non_neg_integer(),
           creation: non_neg_integer()
@@ -26,7 +24,6 @@ defmodule Hashpay.Payday do
     :id,
     :account_id,
     :currency_id,
-    :amount,
     :last_payday,
     :last_withdraw,
     creation: 0
@@ -43,32 +40,43 @@ defmodule Hashpay.Payday do
   def generate_id(account_id, currency_id) do
     hash =
       [account_id, currency_id]
-      |> Enum.join("|")
-      |> :crypto.hash(:sha256)
+      |> IO.iodata_to_binary()
+      |> Hashpay.hash()
       |> :binary.part(0, 16)
       |> Base62.encode()
 
     IO.iodata_to_binary([@prefix, hash])
   end
 
-  def new(
-        _attrs = %{
-          "account_id" => account_id,
-          "currency_id" => currency_id,
-          "amount" => amount,
-          "last_payday" => last_payday,
-          "last_withdraw" => last_withdraw
-        }
-      ) do
+  # def new(
+  #       _attrs = %{
+  #         "account_id" => account_id,
+  #         "currency_id" => currency_id,
+  #         "last_payday" => last_payday,
+  #         "last_withdraw" => last_withdraw
+  #       }
+  #     ) do
+  #   last_round_id = Hashpay.get_last_round_id()
+
+  #   %__MODULE__{
+  #     id: generate_id(account_id, currency_id),
+  #     account_id: account_id,
+  #     currency_id: currency_id,
+  #     last_payday: last_payday,
+  #     last_withdraw: last_withdraw,
+  #     creation: last_round_id
+  #   }
+  # end
+
+  def new(account_id, currency_id) do
     last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
       id: generate_id(account_id, currency_id),
       account_id: account_id,
       currency_id: currency_id,
-      amount: amount,
-      last_payday: last_payday,
-      last_withdraw: last_withdraw,
+      last_payday: 0,
+      last_withdraw: 0,
       creation: last_round_id
     }
   end
@@ -87,6 +95,10 @@ defmodule Hashpay.Payday do
 
   def put(tr, %__MODULE__{} = payday) do
     ThunderRAM.put(tr, @trdb, payday.id, payday)
+  end
+
+  def exists?(tr, id) do
+    ThunderRAM.exists?(tr, @trdb, id)
   end
 
   def delete(tr, id) do

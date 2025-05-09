@@ -19,12 +19,13 @@ defmodule Hashpay.Balance do
   @compile {:inline, [put: 4, incr: 4, get: 3, delete: 2]}
 
   def new(account_id, name, amount \\ 0) do
-    %__MODULE__{
-      id: account_id,
-      name: name,
-      amount: amount,
-      updated: Hashpay.get_last_round_id()
-    }
+    # %__MODULE__{
+    #   id: account_id,
+    #   name: name,
+    #   amount: amount,
+    #   updated: Hashpay.get_last_round_id()
+    # }
+    {{account_id, name}, amount}
   end
 
   def dbopts do
@@ -33,6 +34,26 @@ defmodule Hashpay.Balance do
       handle: ~c"balances",
       exp: true
     ]
+  end
+
+  def incr_non_zero(tr, key, neg_amount) when neg_amount < 0 do
+    ThunderRAM.incr_non_zero(tr, @trdb, key, {2, neg_amount})
+  end
+
+  def incr_non_zero(tr, id, token, neg_amount) when neg_amount < 0 do
+    ThunderRAM.incr_non_zero(tr, @trdb, key_merge(id, token), {2, neg_amount})
+  end
+
+  def incr_limit(tr, key, amount, limit) do
+    ThunderRAM.incr_limit(tr, @trdb, key, {2, amount}, limit)
+  end
+
+  def incr_limit(tr, id, token, amount, limit) do
+    ThunderRAM.incr_limit(tr, @trdb, key_merge(id, token), {2, amount}, limit)
+  end
+
+  def incr(tr, key, amount) do
+    ThunderRAM.incr(tr, @trdb, key, {2, amount})
   end
 
   def incr(tr, id, token, amount) do

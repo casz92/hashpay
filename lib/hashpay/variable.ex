@@ -41,6 +41,14 @@ defmodule Hashpay.Variable do
     :persistent_term.get({:var, "validator_creation_cost"}, 1_000_000)
   end
 
+  def get_merchant_creation_cost do
+    :persistent_term.get({:var, "merchant_creation_cost"}, 1_000_000)
+  end
+
+  def get_validator_withdrawal_fee do
+    :persistent_term.get({:var, "validator_withdrawal_fee"}, 0.01)
+  end
+
   def put_factor_a(tr, value) do
     :persistent_term.put({:var, "factor_a"}, value)
     ThunderRAM.put(tr, @trdb, "factor_a", value)
@@ -76,6 +84,16 @@ defmodule Hashpay.Variable do
     ThunderRAM.put(tr, @trdb, "validator_creation_cost", value)
   end
 
+  def put_merchant_creation_cost(tr, value) do
+    :persistent_term.put({:var, "merchant_creation_cost"}, value)
+    ThunderRAM.put(tr, @trdb, "merchant_creation_cost", value)
+  end
+
+  def put_validator_withdrawal_fee(tr, value) do
+    :persistent_term.put({:var, "validator_withdrawal_fee"}, value)
+    ThunderRAM.put(tr, @trdb, "validator_withdrawal_fee", value)
+  end
+
   def init(tr) do
     case get(tr, "factor_a") do
       {:ok, _value} ->
@@ -90,6 +108,8 @@ defmodule Hashpay.Variable do
         ThunderRAM.put(tr, @trdb, "round_size_target", 0.05)
         ThunderRAM.put(tr, @trdb, "currency_creation_cost", 1_000_000_000)
         ThunderRAM.put(tr, @trdb, "validator_creation_cost", 5_000_000)
+        ThunderRAM.put(tr, @trdb, "merchant_creation_cost", 10_000_000)
+        ThunderRAM.put(tr, @trdb, "validator_withdrawal_fee", 0.005)
         ThunderRAM.sync(tr)
     end
 

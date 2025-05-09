@@ -2,22 +2,6 @@ defmodule Hashpay.Application do
   @moduledoc """
   Módulo de aplicación para Hashpay.
   """
-  # alias Hashpay.Block
-  # alias Hashpay.Round
-  # alias Hashpay.Member
-  # alias Hashpay.Plan
-  # alias Hashpay.Balance
-  # alias Hashpay.Payday
-  # alias Hashpay.Paystream
-  # alias Hashpay.Holding
-  # alias Hashpay.LotteryTicket
-  # alias Hashpay.Merchant
-  # alias Hashpay.Account
-  # alias Hashpay.DB
-  # alias Hashpay.Validator
-  # alias Hashpay.Variable
-  # alias Hashpay.Currency
-  # alias Hashpay.Lottery
   use Application
   require Logger
 
@@ -108,7 +92,8 @@ defmodule Hashpay.Application do
     Lottery,
     LotteryTicket,
     Round,
-    Block
+    Block,
+    Property
   }
 
   defp load_db do
@@ -133,7 +118,8 @@ defmodule Hashpay.Application do
         Paystream,
         Holding,
         Lottery,
-        LotteryTicket
+        LotteryTicket,
+        Property
       ]
     )
 
