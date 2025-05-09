@@ -1,5 +1,5 @@
 defmodule Hashpay.Payday.Command do
-  alias Hashpay.Payday
+  alias Hashpay.{Payday, Account}
   alias Hashpay.Balance
   alias Hashpay.Currency
   alias Hashpay.Property
@@ -15,11 +15,14 @@ defmodule Hashpay.Payday.Command do
     props = Property.get(db, currency_id)
 
     cond do
-      not Map.has_key?(props, "payday") ->
-        {:error, "Currency does not have payday property"}
-
       verified < 0 ->
         {:error, "Account not verified"}
+
+      Account.match?(sender_id) ->
+        {:error, "Invalid account"}
+
+      not Map.has_key?(props, "payday") ->
+        {:error, "Currency does not have payday property"}
 
       not Payday.exists?(db, payday_id) ->
         {:error, "Payday already exists"}
@@ -41,19 +44,26 @@ defmodule Hashpay.Payday.Command do
         currency = Currency.get(db, currency_id)
         props = Property.get(db, currency_id)
         payday_period = Map.get(props, "payday_period", @default_period)
+        payday_max_to_claim = Map.get(props, "payday_max_to_claim", 60)
         amount = Map.get(props, "payday", @default_amount)
+        rounds = div(last_round_id - payday.last_payday, payday_period)
 
-        if last_round_id >= payday.last_payday + payday_period do
-          case Balance.incr_limit(db, currency_id, @supply, amount, currency.max_supply) do
-            {:ok, _new_amount} ->
-              Balance.incr(db, payday_id, amount)
-              Payday.put(db, %{payday | last_payday: last_round_id})
+        cond do
+          rounds > payday_max_to_claim ->
+            Payday.put(db, %{payday | last_payday: last_round_id})
 
-            error ->
-              error
-          end
-        else
-          {:error, "Payday already claimed"}
+          rounds > 0 ->
+            case Balance.incr_limit(db, currency_id, @supply, amount, currency.max_supply) do
+              {:ok, _new_amount} ->
+                Balance.incr(db, payday_id, amount)
+                Payday.put(db, %{payday | last_payday: last_round_id})
+
+              error ->
+                error
+            end
+
+          true ->
+            {:error, "Payday already claimed"}
         end
 
       error ->

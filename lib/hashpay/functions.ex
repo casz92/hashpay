@@ -277,13 +277,20 @@ defmodule Hashpay.Functions do
     },
     %Function{
       id: 800,
+      name: "createPayday",
+      mod: Hashpay.Payday.Commands,
+      fun: :create,
+      auth_type: 1
+    },
+    %Function{
+      id: 801,
       name: "claimPayday",
       mod: Hashpay.Payday.Commands,
       fun: :claim,
       auth_type: 1
     },
     %Function{
-      id: 801,
+      id: 802,
       name: "withdrawPayday",
       mod: Hashpay.Payday.Commands,
       fun: :withdraw,
