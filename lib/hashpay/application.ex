@@ -59,7 +59,6 @@ defmodule Hashpay.Application do
       {:ok, pid} ->
         # conn = DB.get_conn()
         setup_events()
-        load_db()
         Logger.info("Hashpay v#{version} started with #{threads} threads ✨")
         {:ok, pid}
 
@@ -72,59 +71,6 @@ defmodule Hashpay.Application do
   defp init_state do
     ref = :counters.new(1, [:write_concurrency])
     :persistent_term.put(:thread_counter, ref)
-  end
-
-  alias Hashpay.{
-    Variable,
-    Currency,
-    Validator,
-    ValidatorName,
-    Account,
-    AccountName,
-    Merchant,
-    MerchantName,
-    Balance,
-    Member,
-    Plan,
-    Payday,
-    Paystream,
-    Holding,
-    Lottery,
-    LotteryTicket,
-    Round,
-    Block,
-    Property
-  }
-
-  defp load_db do
-    ThunderRAM.new(
-      name: :blockchain,
-      filename: ~c"priv/data/blockchain",
-      modules: [
-        Variable,
-        Round,
-        Block,
-        Account,
-        AccountName,
-        Balance,
-        Currency,
-        Validator,
-        ValidatorName,
-        Merchant,
-        MerchantName,
-        Member,
-        Plan,
-        Payday,
-        Paystream,
-        Holding,
-        Lottery,
-        LotteryTicket,
-        Property
-      ]
-    )
-
-    tr = ThunderRAM.get_tr(:blockchain)
-    Variable.init(tr)
   end
 
   defp setup_events do

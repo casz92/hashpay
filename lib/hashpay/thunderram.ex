@@ -236,7 +236,7 @@ defmodule ThunderRAM do
     %{handle: handle, ets: ets} = Map.get(tables, name)
 
     case :ets.update_counter(ets, key, {elem, amount}, {key, amount}) do
-      result when result > limit ->
+      result when limit != 0 and result > limit ->
         :ets.update_counter(ets, key, {elem, -amount})
         {:error, "Limit exceeded"}
 

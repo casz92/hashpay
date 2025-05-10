@@ -1,7 +1,7 @@
 defmodule Paystream.Command do
   alias Hashpay.{Paystream, Balance, Property, Payday, Merchant}
 
-  @min_withdrawal_amount 10_000
+  @min_withdrawal_amount 100
 
   def send(%{db: db, sender: %{id: merchant_id}}, %{
         "to" => to,
@@ -28,7 +28,7 @@ defmodule Paystream.Command do
         "merchant" => merchant_id
       }) do
     props = Property.get(db, merchant_id)
-    min_withdrawal_amount = Map.get(props, "min_withdrawal_amount", @min_withdrawal_amount)
+    min_withdrawal_amount = Map.get(props, "min_payday_withdrawal_amount", @min_withdrawal_amount)
 
     cond do
       amount < min_withdrawal_amount ->
@@ -38,7 +38,7 @@ defmodule Paystream.Command do
         {:error, "Invalid merchant"}
 
       true ->
-        percent = Map.get(props, "paystream_withdrawal_fee", 0.01)
+        percent = Map.get(props, "paystream_withdrawal_fee", 0)
         fee = amount * percent
         total = amount + fee
         paystream_id = Paystream.generate_id(sender_id, currency_id, merchant_id)

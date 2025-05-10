@@ -15,5 +15,7 @@ hashnumber =
 
 config :hashpay, :hashnumber, hashnumber
 config :hashpay, :pubkey, pubkey
-config :hashpay, :default_currency, "HPY"
-config :hashpay, :default_channel, "origin"
+config :hashpay, :default_currency, "cu_HPY"
+config :hashpay, :default_channel, "#origin"
+config :hashpay, :round_time, 500
+config :hashpay, :round_timeout, 1_500

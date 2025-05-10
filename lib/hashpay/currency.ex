@@ -22,7 +22,6 @@ defmodule Hashpay.Currency do
           decimals: non_neg_integer(),
           symbol: String.t(),
           max_supply: non_neg_integer(),
-          props: [String.t()] | nil,
           creation: non_neg_integer(),
           updated: non_neg_integer()
         }
@@ -35,15 +34,17 @@ defmodule Hashpay.Currency do
     :decimals,
     :symbol,
     :max_supply,
-    :props,
     :creation,
     :updated
   ]
+
+  alias Hashpay.Property
 
   @prefix "cu_"
   @regex ~r/^(cu_)[A-Z]{1,5}$/
   @regex_name ~r/^[A-Z]{1,5}$/
   @trdb :currencies
+  @default_currency Application.compile_env(:hashpay, :default_currency)
 
   def match?(id) do
     Regex.match?(@regex, id)
@@ -61,25 +62,24 @@ defmodule Hashpay.Currency do
 
   def new(
         attrs = %{
+          "ticker" => ticker,
           "name" => name,
           "pubkey" => pubkey,
           "decimals" => decimals,
           "symbol" => symbol,
-          "max_supply" => max_supply,
-          "props" => props
+          "max_supply" => max_supply
         }
       ) do
     last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
-      id: generate_id(name),
+      id: generate_id(ticker),
       name: name,
       pubkey: Base.decode64!(pubkey),
       picture: Map.get(attrs, "picture", nil),
       decimals: decimals,
       symbol: symbol,
       max_supply: max_supply,
-      props: props,
       creation: last_round_id,
       updated: last_round_id
     }
@@ -91,6 +91,31 @@ defmodule Hashpay.Currency do
       handle: ~c"currencies",
       exp: true
     ]
+  end
+
+  def init(tr) do
+    if exists?(tr, @default_currency) do
+      default =
+        %{
+          "ticker" => @default_currency,
+          "name" => "Hashpay",
+          "pubkey" => nil,
+          "decimals" => 6,
+          "symbol" => "ℏ",
+          "max_supply" => 500_000_000_000_000_000_000
+        }
+        |> new()
+
+      ThunderRAM.put(tr, @trdb, default.id, default)
+
+      Property.put(tr, default.id, %{
+        "payday" => 100,
+        "min_payday_withdrawal_amount" => 100,
+        "payday_period" => 172_800,
+        "payday_max_to_claim" => 60,
+        "paystream_withdrawal_fee" => 0.01
+      })
+    end
   end
 
   def get(tr, id) do
