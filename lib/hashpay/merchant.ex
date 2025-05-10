@@ -109,7 +109,7 @@ defmodule Hashpay.MerchantName do
     [
       name: @trdb,
       handle: ~c"merchant_names_idx",
-      exp: false
+      exp: true
     ]
   end
 

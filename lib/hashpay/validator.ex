@@ -149,7 +149,7 @@ defmodule Hashpay.ValidatorName do
     [
       name: @trdb,
       handle: ~c"validator_names_idx",
-      exp: false
+      exp: true
     ]
   end
 

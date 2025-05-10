@@ -89,7 +89,7 @@ defmodule Hashpay.Currency do
     [
       name: @trdb,
       handle: ~c"currencies",
-      exp: true
+      exp: false
     ]
   end
 

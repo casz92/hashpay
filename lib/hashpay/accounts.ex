@@ -92,7 +92,7 @@ defmodule Hashpay.AccountName do
     [
       name: @trdb,
       handle: ~c"account_names_idx",
-      exp: false
+      exp: true
     ]
   end
 
