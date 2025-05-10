@@ -1,19 +1,13 @@
 defmodule Hashpay.Variable.Command do
   alias Hashpay.Variable
 
-  def set(ctx, %{"key" => key, "value" => value}) do
-    Variable.put(ctx.db, key, value)
+  @governance "governance"
+
+  def set(ctx = %{db: db, sender: %{id: @governance}}, %{"key" => key, "value" => value}) do
+    Variable.put(db, key, value)
   end
 
-  def set(ctx, key, value) do
-    Variable.put(ctx.db, key, value)
-  end
-
-  def delete(ctx, %{"key" => key}) do
-    Variable.delete(ctx.db, key)
-  end
-
-  def delete(ctx, key) do
-    Variable.delete(ctx.db, key)
+  def delete(ctx = %{db: db, sender: %{id: @governance}}, %{"key" => key}) do
+    Variable.delete(db, key)
   end
 end

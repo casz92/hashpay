@@ -52,7 +52,7 @@ defmodule Hashpay.Validator do
   alias Hashpay.ValidatorName
 
   @prefix "v_"
-  @regex ~r/^v_[a-zA-Z0-9]*$/
+  # @regex ~r/^v_[a-zA-Z0-9]*$/
   @trdb :validators
 
   @compile {:inline, [put: 2, put_new: 2, exists?: 2, delete: 2, total: 1]}
@@ -62,9 +62,8 @@ defmodule Hashpay.Validator do
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
   end
 
-  def match?(id) do
-    Regex.match?(@regex, id)
-  end
+  def match?(<<@prefix, _::binary>>), do: true
+  def match?(_), do: false
 
   def new(
         attrs = %{

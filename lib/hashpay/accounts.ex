@@ -21,7 +21,7 @@ defmodule Hashpay.Account do
   ]
 
   @prefix "ac_"
-  @regex ~r/^ac_[a-zA-Z0-9]*$/
+  # @regex ~r/^ac_[a-zA-Z0-9]*$/
   @trdb :accounts
 
   @compile {:inline, [put: 2, put_new: 2, exists?: 2, delete: 2]}
@@ -39,9 +39,8 @@ defmodule Hashpay.Account do
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
   end
 
-  def match?(id) do
-    Regex.match?(@regex, id)
-  end
+  def match?(<<@prefix, _::binary>>), do: true
+  def match?(_), do: false
 
   def new(attrs = %{"pubkey" => pubkey, "name" => name, "channel" => channel}) do
     %__MODULE__{

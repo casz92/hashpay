@@ -85,11 +85,14 @@ defmodule Hashpay.Command do
       "ac_" ->
         Account.get(tr, id)
 
-      "v_" ->
-        Validator.get(tr, id)
-
       "mc_" ->
         Merchant.get(tr, id)
+
+      "cu_" ->
+        Merchant.get(tr, id)
+
+      <<"v_", _::binary>> ->
+        Validator.get(tr, id)
 
       _ ->
         {:error, "Invalid sender"}

@@ -41,14 +41,13 @@ defmodule Hashpay.Currency do
   alias Hashpay.Property
 
   @prefix "cu_"
-  @regex ~r/^(cu_)[A-Z]{1,5}$/
+  # @regex ~r/^(cu_)[A-Z]{1,5}$/
   @regex_name ~r/^[A-Z]{1,5}$/
   @trdb :currencies
   @default_currency Application.compile_env(:hashpay, :default_currency)
 
-  def match?(id) do
-    Regex.match?(@regex, id)
-  end
+  def match?(<<@prefix, _::binary>>), do: true
+  def match?(_), do: false
 
   def match_name?(name) do
     Regex.match?(@regex_name, name)
@@ -62,7 +61,7 @@ defmodule Hashpay.Currency do
 
   def new(
         attrs = %{
-          "ticker" => ticker,
+          "id" => id,
           "name" => name,
           "pubkey" => pubkey,
           "decimals" => decimals,
@@ -73,7 +72,7 @@ defmodule Hashpay.Currency do
     last_round_id = Hashpay.get_last_round_id()
 
     %__MODULE__{
-      id: generate_id(ticker),
+      id: generate_id(id),
       name: name,
       pubkey: Base.decode64!(pubkey),
       picture: Map.get(attrs, "picture", nil),

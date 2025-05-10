@@ -37,7 +37,7 @@ defmodule Hashpay.Merchant do
   alias Hashpay.MerchantName
 
   @prefix "mc_"
-  @regex ~r/^mc_[a-zA-Z0-9]*$/
+  # @regex ~r/^mc_[a-zA-Z0-9]*$/
   @trdb :merchants
 
   def generate_id(pubkey) do
@@ -45,9 +45,8 @@ defmodule Hashpay.Merchant do
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
   end
 
-  def match?(id) do
-    Regex.match?(@regex, id)
-  end
+  def match?(<<@prefix, _::binary>>), do: true
+  def match?(_), do: false
 
   def new(attrs = %{"pubkey" => pubkey, "name" => name, "channel" => channel}) do
     last_round_id = Hashpay.get_last_round_id()
