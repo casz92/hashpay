@@ -238,11 +238,11 @@ defmodule Hashpay.Block do
     ThunderRAM.put(tr, @trdb, block.id, block)
   end
 
-  def delete(tr, id) do
-    ThunderRAM.delete(tr, @trdb, id)
-  end
-
   def delete(tr, %__MODULE__{} = block) do
     ThunderRAM.delete(tr, @trdb, block.id)
+  end
+
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 end

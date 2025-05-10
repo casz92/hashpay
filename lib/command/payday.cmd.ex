@@ -21,8 +21,8 @@ defmodule Hashpay.Payday.Command do
       Account.match?(sender_id) ->
         {:error, "Invalid account"}
 
-      not Map.has_key?(props, "payday") ->
-        {:error, "Currency does not have payday property"}
+      is_nil(props) or not Map.has_key?(props, "payday") ->
+        {:error, "Currency is not payday property"}
 
       not Payday.exists?(db, payday_id) ->
         {:error, "Payday already exists"}

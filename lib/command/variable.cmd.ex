@@ -9,6 +9,10 @@ defmodule Hashpay.Variable.Command do
     Variable.put(ctx.db, key, value)
   end
 
+  def delete(ctx, %{"key" => key}) do
+    Variable.delete(ctx.db, key)
+  end
+
   def delete(ctx, key) do
     Variable.delete(ctx.db, key)
   end

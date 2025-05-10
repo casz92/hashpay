@@ -248,11 +248,11 @@ defmodule Hashpay.Round do
     ThunderRAM.put(tr, @trdb, round.id, round)
   end
 
-  def delete(tr, id) do
-    ThunderRAM.delete(tr, @trdb, id)
-  end
-
   def delete(tr, %__MODULE__{} = round) do
     ThunderRAM.delete(tr, @trdb, round.id)
+  end
+
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 end

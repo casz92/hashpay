@@ -1,7 +1,5 @@
 defmodule Hashpay.Balance.Command do
-  alias Hashpay.Account
-  alias Hashpay.Currency
-  alias Hashpay.Balance
+  alias Hashpay.{Account, Balance, Currency, Property}
 
   @supply "@supply"
 
@@ -9,6 +7,8 @@ defmodule Hashpay.Balance.Command do
         ctx = %{db: db, sender: %{id: currency_id, max_supply: max_supply}},
         %{"to" => to, "amount" => amount}
       ) do
+    mint_enabled = Property.get(db, currency_id, "mint", false)
+
     cond do
       amount <= 0 ->
         {:error, "Invalid amount"}
@@ -21,6 +21,9 @@ defmodule Hashpay.Balance.Command do
 
       not Currency.exists?(db, currency_id) ->
         {:error, "Currency not found"}
+
+      mint_enabled == false ->
+        {:error, "Currency is not mint property"}
 
       true ->
         case Balance.incr_limit(db, currency_id, @supply, amount, max_supply) do
@@ -50,7 +53,7 @@ defmodule Hashpay.Balance.Command do
         total = amount + fee
 
         case Balance.incr_non_zero(db, from, currency_id, -total) do
-          _amount ->
+          {:ok, _amount} ->
             Balance.incr(db, to, currency_id, amount)
             Balance.incr(db, channel, currency_id, fee)
 
@@ -60,7 +63,7 @@ defmodule Hashpay.Balance.Command do
     end
   end
 
-  def frozen(ctx = %{db: db}, to, currency_id, amount) do
+  def frozen(ctx = %{db: db}, %{"to" => to, "amount" => amount, "currency" => currency_id}) do
     cond do
       amount <= 0 ->
         {:error, "Invalid amount"}
@@ -81,12 +84,17 @@ defmodule Hashpay.Balance.Command do
   end
 
   def unfrozen(ctx = %{db: db}, to, currency_id, amount) do
+    frozen_enabled = Property.get(db, currency_id, "frozen", false)
+
     cond do
       amount <= 0 ->
         {:error, "Invalid amount"}
 
       ctx.sender.id != currency_id ->
         {:error, "Invalid sender"}
+
+      frozen_enabled == false ->
+        {:error, "Currency is not frozen property"}
 
       not Account.exists?(db, to) ->
         {:error, "Account not found"}
@@ -100,12 +108,18 @@ defmodule Hashpay.Balance.Command do
     end
   end
 
-  def burn(ctx = %{db: db}, currency_id, amount) do
-    to = ctx.sender.id
+  def burn(%{db: db}, %{"amount" => amount, "currency" => currency_id, "to" => to}) do
+    burn_enabled = Property.get(db, currency_id, "burn", false)
 
     cond do
       amount <= 0 ->
         {:error, "Invalid amount"}
+
+      to != currency_id ->
+        {:error, "Invalid sender"}
+
+      burn_enabled == false ->
+        {:error, "Currency is not burn property"}
 
       not Account.exists?(db, to) ->
         {:error, "Account not found"}
@@ -119,13 +133,18 @@ defmodule Hashpay.Balance.Command do
     end
   end
 
-  def burn(ctx = %{db: db}, to, currency_id, amount) do
+  def burn(%{db: db, sender: %{id: to}}, %{"amount" => amount, "currency" => currency_id}) do
+    burn_enabled = Property.get(db, currency_id, "burn", false)
+
     cond do
       amount <= 0 ->
         {:error, "Invalid amount"}
 
-      ctx.sender.id != currency_id ->
+      to != currency_id ->
         {:error, "Invalid sender"}
+
+      burn_enabled == false ->
+        {:error, "Currency is not burn property"}
 
       not Account.exists?(db, to) ->
         {:error, "Account not found"}

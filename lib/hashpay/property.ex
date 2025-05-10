@@ -4,7 +4,6 @@ defmodule Hashpay.Property do
   """
 
   @trdb :properties
-  import ThunderRAM, only: [key_merge: 2]
 
   def dbopts do
     [
@@ -15,21 +14,38 @@ defmodule Hashpay.Property do
   end
 
   def get(tr, key) do
-    ThunderRAM.get(tr, @trdb, key)
+    case ThunderRAM.get(tr, @trdb, key) do
+      {:ok, props} ->
+        props
+
+      _ ->
+        nil
+    end
   end
 
-  def get(tr, id, name) do
-    key = key_merge(id, name)
-    ThunderRAM.get(tr, @trdb, key)
+  def get(tr, key, name, default \\ nil) do
+    case ThunderRAM.get(tr, @trdb, key) do
+      {:ok, props} ->
+        Map.get(props, name, nil)
+
+      _ ->
+        default
+    end
   end
 
   def put(tr, key, value) do
     ThunderRAM.put(tr, @trdb, key, value)
   end
 
-  def put(tr, id, name, value) do
-    key = key_merge(id, name)
-    ThunderRAM.put(tr, @trdb, key, value)
+  def put(tr, key, name, value) do
+    case get(tr, key) do
+      {:ok, props} ->
+        props = Map.put(props, name, value)
+        ThunderRAM.put(tr, @trdb, key, props)
+
+      _ ->
+        ThunderRAM.put(tr, @trdb, key, %{name => value})
+    end
   end
 
   def exists?(tr, key) do
@@ -37,8 +53,13 @@ defmodule Hashpay.Property do
   end
 
   def exists?(tr, id, name) do
-    key = key_merge(id, name)
-    ThunderRAM.exists?(tr, @trdb, key)
+    case get(tr, id) do
+      {:ok, props} ->
+        Map.has_key?(props, name)
+
+      _ ->
+        false
+    end
   end
 
   def delete(tr, key) do
@@ -46,7 +67,18 @@ defmodule Hashpay.Property do
   end
 
   def delete(tr, id, name) do
-    key = key_merge(id, name)
-    ThunderRAM.delete(tr, @trdb, key)
+    case get(tr, id) do
+      {:ok, props} ->
+        props = Map.delete(props, name)
+
+        if map_size(props) == 0 do
+          ThunderRAM.delete(tr, @trdb, id)
+        else
+          ThunderRAM.put(tr, @trdb, id, props)
+        end
+
+      _ ->
+        nil
+    end
   end
 end

@@ -109,6 +109,9 @@ defmodule Hashpay.Currency do
       ThunderRAM.put(tr, @trdb, default.id, default)
 
       Property.put(tr, default.id, %{
+        "mint" => true,
+        "burn" => true,
+        "frozen" => true,
         "payday" => 100,
         "min_payday_withdrawal_amount" => 100,
         "payday_period" => 172_800,

@@ -90,14 +90,14 @@ defmodule Hashpay.Merchant do
     ThunderRAM.exists?(tr, @trdb, id)
   end
 
-  def delete(tr, id) do
-    merchant = get(tr, id)
-    ThunderRAM.delete(tr, @trdb, id)
+  def delete(tr, %__MODULE__{} = merchant) do
+    ThunderRAM.delete(tr, @trdb, merchant.id)
     MerchantName.delete(tr, merchant.name)
   end
 
-  def delete(tr, %__MODULE__{} = merchant) do
-    ThunderRAM.delete(tr, @trdb, merchant.id)
+  def delete(tr, id) do
+    merchant = get(tr, id)
+    ThunderRAM.delete(tr, @trdb, id)
     MerchantName.delete(tr, merchant.name)
   end
 end

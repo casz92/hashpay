@@ -111,12 +111,12 @@ defmodule Hashpay.Lottery do
     ThunderRAM.put(tr, @trdb, lottery.id, lottery)
   end
 
-  def delete(tr, id) do
-    ThunderRAM.delete(tr, @trdb, id)
-  end
-
   def delete(tr, %__MODULE__{} = lottery) do
     ThunderRAM.delete(tr, @trdb, lottery.id)
+  end
+
+  def delete(tr, id) do
+    ThunderRAM.delete(tr, @trdb, id)
   end
 
   def change_status(tr, id, status) do
