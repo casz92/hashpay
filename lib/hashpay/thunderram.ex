@@ -216,6 +216,7 @@ defmodule ThunderRAM do
     :rocksdb.batch_put(batch, handle, key, term_to_binary(result))
 
     :rocksdb.batch_merge(batch, key, term_to_binary({:int_add, amount}), [])
+    result
   end
 
   def incr_non_zero(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, neg_amount}) do

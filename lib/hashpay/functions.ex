@@ -362,6 +362,30 @@ defmodule Hashpay.Functions do
       fun: :delete,
       auth_type: 1,
       thread: :args
+    },
+    %Function{
+      id: 1300,
+      name: "proposeGovernance",
+      mod: Hashpay.Governance.Proposal.Command,
+      fun: :propose,
+      auth_type: 1,
+      thread: :type_and_args
+    },
+    %Function{
+      id: 1301,
+      name: "voteGovernance",
+      mod: Hashpay.Governance.Proposal.Command,
+      fun: :vote,
+      auth_type: 1,
+      thread: :type_and_args
+    },
+    %Function{
+      id: 1302,
+      name: "cancelGovernance",
+      mod: Hashpay.Governance.Proposal.Command,
+      fun: :cancel,
+      auth_type: 1,
+      thread: :type_and_args
     }
   ]
 
