@@ -1,4 +1,4 @@
-defmodule Hashpay.Governance.Proposal do
+defmodule Hashpay.GovProposal do
   @moduledoc """
   Estructura y funciones para las propuestas de gobernabilidad de la blockchain de Hashpay.
   Una propuesta contiene:
@@ -98,15 +98,15 @@ defmodule Hashpay.Governance.Proposal do
     ThunderRAM.get(tr, @trdb, id)
   end
 
-  def put(tr, %__MODULE__{} = proposal) do
-    ThunderRAM.put(tr, @trdb, proposal.id, proposal)
+  def put(tr, %__MODULE__{} = govproposal) do
+    ThunderRAM.put(tr, @trdb, govproposal.id, govproposal)
   end
 
-  def change_status(tr, proposal = %__MODULE__{}, status) when status in [0, 1, 2, 3, 4] do
-    ThunderRAM.put(tr, @trdb, proposal.id, %{proposal | status: status})
+  def change_status(tr, govproposal = %__MODULE__{}, status) when status in [0, 1, 2, 3, 4] do
+    ThunderRAM.put(tr, @trdb, govproposal.id, %{govproposal | status: status})
   end
 
-  def cancel(tr, proposal = %__MODULE__{}) do
-    ThunderRAM.put(tr, @trdb, proposal.id, %{proposal | status: 3})
+  def cancel(tr, govproposal = %__MODULE__{}) do
+    ThunderRAM.put(tr, @trdb, govproposal.id, %{govproposal | status: 3})
   end
 end

@@ -16,6 +16,15 @@ import_config "genesis.exs"
 config :hashpay, :channel, "first"
 config :hashpay, :threads, System.schedulers_online()
 
+# ID del validador
+config :hashpay, :id, "v_1UmjkVzfksJHu4UqEohMFB"
+
+# Clave privada del validador
+config :hashpay,
+       :privkey,
+       <<2, 193, 110, 47, 245, 211, 89, 165, 52, 151, 77, 240, 214, 234, 196, 83, 224, 67, 72,
+         113, 134, 254, 250, 189, 206, 42, 16, 74, 91, 86, 232, 153>>
+
 config :hashpay, :event_consumer_pool,
   name: {:local, :event_consumer_pool},
   worker_module: BlockEventConsumer,

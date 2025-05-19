@@ -245,4 +245,10 @@ defmodule Hashpay.Block do
   def delete(tr, id) do
     ThunderRAM.delete(tr, @trdb, id)
   end
+
+  def to_struct(data = %__MODULE__{}), do: data
+
+  def to_struct(data) do
+    struct(__MODULE__, data)
+  end
 end

@@ -55,7 +55,7 @@ defmodule Hashpay.Validator do
   # @regex ~r/^v_[a-zA-Z0-9]*$/
   @trdb :validators
 
-  @compile {:inline, [put: 2, put_new: 2, exists?: 2, delete: 2, total: 1]}
+  @compile {:inline, [put: 2, put_new: 2, exists?: 2, delete: 2, total: 1, slot: 2]}
 
   def generate_id(pubkey) do
     <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
@@ -98,12 +98,37 @@ defmodule Hashpay.Validator do
     [
       name: @trdb,
       handle: ~c"validators",
-      exp: true
+      exp: false,
+      ets_type: :ordered_set
     ]
+  end
+
+  def init(tr) do
+    if count(tr) == 0 do
+      first_val = Application.get_env(:hashpay, :first_validator)
+      validator = new(first_val)
+      tr = ThunderRAM.new_batch(tr)
+      put_new(tr, validator)
+      ThunderRAM.sync(tr)
+    end
+
+    load_all(tr)
+  end
+
+  def count(tr) do
+    ThunderRAM.fold(tr, @trdb, fn _, _, acc -> acc + 1 end, 0)
+  end
+
+  def load_all(tr) do
+    ThunderRAM.load_all(tr, @trdb)
   end
 
   def get(tr, id) do
     ThunderRAM.get(tr, @trdb, id)
+  end
+
+  def slot(tr, position) do
+    ThunderRAM.slot(tr, @trdb, position)
   end
 
   def put(tr, %__MODULE__{} = validator) do
@@ -113,6 +138,7 @@ defmodule Hashpay.Validator do
   def put_new(tr, %__MODULE__{} = validator) do
     ThunderRAM.put(tr, @trdb, validator.id, validator)
     ValidatorName.put(tr, validator.name, validator.id)
+    ThunderRAM.count_one(tr, @trdb)
   end
 
   def exists?(tr, id) do
@@ -122,8 +148,13 @@ defmodule Hashpay.Validator do
   def merge(tr, id, attrs) do
     case get(tr, id) do
       {:ok, validator} ->
-        validator = Map.merge(validator, struct(__MODULE__, attrs))
+        validator = Map.merge(validator, attrs)
         ThunderRAM.put(tr, @trdb, validator.id, validator)
+
+        if Map.has_key?(attrs, :name) do
+          ValidatorName.delete(tr, validator.name)
+          ValidatorName.put(tr, attrs.name, validator.id)
+        end
 
       _ ->
         {:error, :not_found}
@@ -131,13 +162,19 @@ defmodule Hashpay.Validator do
   end
 
   def delete(tr, id) do
-    validator = get(tr, id)
-    ThunderRAM.delete(tr, @trdb, id)
-    ValidatorName.delete(tr, validator.name)
+    case get(tr, id) do
+      {:ok, validator} ->
+        ThunderRAM.delete(tr, @trdb, id)
+        ValidatorName.delete(tr, validator.name)
+        ThunderRAM.discount_one(tr, @trdb)
+
+      _ ->
+        {:error, :not_found}
+    end
   end
 
   def total(tr) do
-    ThunderRAM.count(tr, @trdb)
+    ThunderRAM.total(tr, @trdb)
   end
 end
 
@@ -148,7 +185,7 @@ defmodule Hashpay.ValidatorName do
     [
       name: @trdb,
       handle: ~c"validator_names_idx",
-      exp: true
+      exp: false
     ]
   end
 

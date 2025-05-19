@@ -4,8 +4,8 @@ import Config
 
 # Configuración para el servidor HTTP/HTTPS
 config :hashpay,
-  http_port: 5000,
-  https_port: 5001
+  http_port: 4000,
+  https_port: 4001
 
 # Configuración para ScyllaDB/Cassandra usando Xandra
 config :hashpay, :scylla,

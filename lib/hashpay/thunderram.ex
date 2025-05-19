@@ -15,6 +15,7 @@ defmodule ThunderRAM do
 
   defstruct [:batch, :db, :name, :tables]
   @key :thunderram
+  @stat_count "$count"
 
   @open_options [
     create_if_missing: true,
@@ -23,7 +24,17 @@ defmodule ThunderRAM do
 
   alias Hashpay.Cache
 
-  @compile {:inline, [exists?: 3, get: 3, put: 4, incr: 4, delete: 3, count: 2]}
+  @compile {:inline,
+            [
+              exists?: 3,
+              get: 3,
+              put: 4,
+              incr: 4,
+              delete: 3,
+              total: 2,
+              binary_to_term: 1,
+              term_to_binary: 1
+            ]}
 
   def new(opts) do
     name = Keyword.get(opts, :name) || raise("`name` is required")
@@ -64,7 +75,8 @@ defmodule ThunderRAM do
       |> Enum.map(fn {mod, handle} ->
         dbopts = mod.dbopts()
         name = dbopts[:name]
-        ets = :ets.new(dbopts[:name], [:set, :public, read_concurrency: true])
+        ets_type = Keyword.get(dbopts, :ets_type, :set)
+        ets = :ets.new(dbopts[:name], [ets_type, :public, read_concurrency: true])
         exp = dbopts[:exp]
         {name, %{handle: handle, ets: ets, exp: exp}}
       end)
@@ -135,10 +147,16 @@ defmodule ThunderRAM do
     direction = Keyword.get(opts, :direction, :next)
 
     {:ok, iter} = :rocksdb.iterator(db, handle, [])
-    :rocksdb.iterator_move(iter, initial)
 
     try do
-      do_foreach(iter, fun, direction)
+      case :rocksdb.iterator_move(iter, initial) do
+        {:ok, key, value} ->
+          fun.(key, binary_to_term(value))
+          do_foreach(iter, fun, direction)
+
+        _ ->
+          :rocksdb.iterator_close(iter)
+      end
     rescue
       e ->
         :rocksdb.iterator_close(iter)
@@ -146,11 +164,11 @@ defmodule ThunderRAM do
     end
   end
 
-  defp do_foreach(iter, fun, direction \\ :next) do
+  defp do_foreach(iter, fun, direction) do
     case :rocksdb.iterator_move(iter, direction) do
       {:ok, key, value} ->
         fun.(key, binary_to_term(value))
-        do_foreach(iter, fun)
+        do_foreach(iter, fun, direction)
 
       _ ->
         :rocksdb.iterator_close(iter)
@@ -163,10 +181,19 @@ defmodule ThunderRAM do
     direction = Keyword.get(opts, :direction, :next)
 
     {:ok, iter} = :rocksdb.iterator(db, handle, [])
-    :rocksdb.iterator_move(iter, initial)
 
     try do
-      do_while(iter, fun, direction)
+      case :rocksdb.iterator_move(iter, initial) do
+        {:ok, key, value} ->
+          if fun.(key, binary_to_term(value)) == :next do
+            do_while(iter, fun, direction)
+          else
+            :rocksdb.iterator_close(iter)
+          end
+
+        _ ->
+          :rocksdb.iterator_close(iter)
+      end
     rescue
       e ->
         :rocksdb.iterator_close(iter)
@@ -174,17 +201,53 @@ defmodule ThunderRAM do
     end
   end
 
-  defp do_while(iter, fun, direction \\ :next) do
+  defp do_while(iter, fun, direction) do
     case :rocksdb.iterator_move(iter, direction) do
       {:ok, key, value} ->
         if fun.(key, binary_to_term(value)) == :next do
-          do_while(iter, fun)
+          do_while(iter, fun, direction)
         else
           :rocksdb.iterator_close(iter)
         end
 
       _ ->
         :rocksdb.iterator_close(iter)
+    end
+  end
+
+  def fold(%ThunderRAM{db: db, tables: tables}, name, fun, acc, opts \\ []) do
+    %{handle: handle} = Map.get(tables, name)
+    initial = Keyword.get(opts, :init, <<>>)
+    direction = Keyword.get(opts, :direction, :next)
+
+    {:ok, iter} = :rocksdb.iterator(db, handle, [])
+
+    try do
+      case :rocksdb.iterator_move(iter, initial) do
+        {:ok, key, value} ->
+          acc = fun.(key, binary_to_term(value), acc)
+          do_fold(iter, fun, acc, direction)
+
+        _ ->
+          :rocksdb.iterator_close(iter)
+          acc
+      end
+    rescue
+      e ->
+        :rocksdb.iterator_close(iter)
+        reraise e, __STACKTRACE__
+    end
+  end
+
+  defp do_fold(iter, fun, acc, direction) do
+    case :rocksdb.iterator_move(iter, direction) do
+      {:ok, key, value} ->
+        acc = fun.(key, binary_to_term(value), acc)
+        do_fold(iter, fun, acc, direction)
+
+      _ ->
+        :rocksdb.iterator_close(iter)
+        acc
     end
   end
 
@@ -210,50 +273,84 @@ defmodule ThunderRAM do
     end
   end
 
-  def incr(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}) do
+  def slot(%ThunderRAM{tables: tables}, name, position) do
+    %{ets: ets} = Map.get(tables, name)
+    :ets.slot(ets, position)
+  end
+
+  defp incr_from_db(tr, ets, name, key) do
+    unless :ets.member(ets, key) do
+      case get_from_db(tr, name, key) do
+        {:ok, value} -> :ets.insert(ets, {key, value})
+        _ -> false
+      end
+    end
+  end
+
+  def incr(tr = %ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}) do
     %{handle: handle, ets: ets} = Map.get(tables, name)
-    result = :ets.update_counter(ets, key, {elem, amount}, {key, amount})
+
+    incr_from_db(tr, ets, name, key)
+
+    result = :ets.update_counter(ets, key, {elem, amount}, {key, 0})
     :rocksdb.batch_put(batch, handle, key, term_to_binary(result))
 
-    :rocksdb.batch_merge(batch, key, term_to_binary({:int_add, amount}), [])
+    # :rocksdb.batch_merge(batch, key, term_to_binary({:int_add, amount}), [])
     result
   end
 
-  def incr_non_zero(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, neg_amount}) do
+  def incr_non_zero(tr = %ThunderRAM{batch: batch, tables: tables}, name, key, {elem, neg_amount}) do
     %{handle: handle, ets: ets} = Map.get(tables, name)
 
-    case :ets.update_counter(ets, key, {elem, neg_amount}, {key, neg_amount}) do
+    incr_from_db(tr, ets, name, key)
+
+    case :ets.update_counter(ets, key, {elem, neg_amount}, {key, 0}) do
       result when 0 > result ->
         :ets.update_counter(ets, key, {elem, abs(neg_amount)})
         {:error, "Insufficient balance"}
 
       result ->
-        :rocksdb.batch_merge(batch, handle, key, term_to_binary({:int_add, neg_amount}))
+        :rocksdb.batch_put(batch, handle, key, term_to_binary(result))
+        # :rocksdb.batch_merge(batch, handle, key, term_to_binary({:int_add, neg_amount}))
         {:ok, result}
     end
   end
 
-  def incr_limit(%ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}, limit) do
+  def incr_limit(tr = %ThunderRAM{batch: batch, tables: tables}, name, key, {elem, amount}, limit) do
     %{handle: handle, ets: ets} = Map.get(tables, name)
 
-    case :ets.update_counter(ets, key, {elem, amount}, {key, amount}) do
+    incr_from_db(tr, ets, name, key)
+
+    case :ets.update_counter(ets, key, {elem, amount}, {key, 0}) do
       result when limit != 0 and result > limit ->
         :ets.update_counter(ets, key, {elem, -amount})
         {:error, "Limit exceeded"}
 
       result ->
-        :rocksdb.batch_merge(batch, handle, key, term_to_binary({:int_add, amount}))
+        :rocksdb.batch_put(batch, handle, key, term_to_binary(result))
+        # :rocksdb.batch_merge(batch, handle, key, term_to_binary({:int_add, amount}))
         {:ok, result}
     end
   end
 
-  def count(%ThunderRAM{db: db, tables: tables}, name) do
-    %{handle: handle} = Map.get(tables, name)
-
-    case :rocksdb.get_property(db, handle, "rocksdb.estimate-num-keys") do
-      {:ok, count} -> String.to_integer(count)
+  def total(tr, name) do
+    case get(tr, name, @stat_count) do
+      {:ok, count} -> count
       _ -> 0
     end
+  end
+
+  def count_one(tr, name) do
+    incr(tr, name, @stat_count, {2, 1})
+  end
+
+  def discount_one(tr, name) do
+    incr(tr, name, @stat_count, {2, -1})
+  end
+
+  def ets_total(%ThunderRAM{tables: tables}, name) do
+    %{ets: ets} = Map.get(tables, name)
+    :ets.info(ets, :size)
   end
 
   def delete(%ThunderRAM{batch: batch, tables: tables}, name, key) do
@@ -268,7 +365,7 @@ defmodule ThunderRAM do
 
     case :rocksdb.get(db, handle, key, []) do
       :not_found ->
-        nil
+        {:error, :not_found}
 
       {:ok, value} ->
         result = binary_to_term(value)
@@ -288,6 +385,14 @@ defmodule ThunderRAM do
     end
 
     %{tr | batch: nil}
+  end
+
+  def load_all(tr = %ThunderRAM{tables: tables}, name) do
+    %{ets: ets} = Map.get(tables, name)
+
+    foreach(tr, name, fn key, value ->
+      :ets.insert(ets, {key, value})
+    end)
   end
 
   def savepoint(%ThunderRAM{batch: batch}) do

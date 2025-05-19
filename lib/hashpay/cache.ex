@@ -33,7 +33,13 @@ defmodule Hashpay.Cache do
   """
   def start_link(_opts) do
     # Crear tabla ETS con nombre del módulo, pública y con concurrencia de lectura
-    :ets.new(@table_name, [:named_table, :public, :set, {:read_concurrency, true}])
+    :ets.new(@table_name, [
+      :set,
+      :public,
+      :named_table,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
 
     case GenServer.start_link(__MODULE__, [], name: __MODULE__) do
       {:ok, pid} ->
@@ -52,8 +58,8 @@ defmodule Hashpay.Cache do
     {:ok, args}
   end
 
-  @spec put(binary(), Hashpay.object_type()) :: boolean()
-  def put(id, type) do
+  @spec put(Hashpay.object_type(), binary()) :: boolean()
+  def put(type, id) do
     timestamp = now()
     :ets.insert(@table_name, {id, type, timestamp})
   end
@@ -78,6 +84,7 @@ defmodule Hashpay.Cache do
   @spec cleanup(older_than :: integer()) :: count :: integer()
   def cleanup(older_than) do
     tr = ThunderRAM.get_tr(:blockchain)
+    tr = ThunderRAM.new_batch(tr)
 
     :ets.foldl(
       fn {id, type, readed_at}, acc ->
@@ -99,6 +106,8 @@ defmodule Hashpay.Cache do
       0,
       @table_name
     )
+
+    ThunderRAM.sync(tr)
   end
 
   defp now do

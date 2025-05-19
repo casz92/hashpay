@@ -1,6 +1,6 @@
-defmodule Hashpay.Governance.Proposal.Command do
+defmodule Hashpay.GovProposal.Command do
   alias Hashpay.{Balance, Validator, Functions, Property}
-  alias Hashpay.Governance.Proposal
+  alias Hashpay.GovProposal
 
   @min_end_time 2 * 3600
   @max_end_time 2 * 3600 * 24 * 30
@@ -37,9 +37,9 @@ defmodule Hashpay.Governance.Proposal.Command do
       true ->
         case Functions.get_by_name(action) do
           {:ok, _function} ->
-            proposal = Proposal.new(tx_hash, Map.put(attrs, "proposer", sender_id))
-            Proposal.put(db, proposal)
-            Property.put(db, proposal.id, "voters", MapSet.new())
+            govproposal = GovProposal.new(tx_hash, Map.put(attrs, "proposer", sender_id))
+            GovProposal.put(db, govproposal)
+            Property.put(db, govproposal.id, "voters", MapSet.new())
 
           _ ->
             {:error, "Function not found"}
@@ -73,17 +73,17 @@ defmodule Hashpay.Governance.Proposal.Command do
 
     cond do
       is_nil(props) ->
-        {:error, "Proposal not found"}
+        {:error, "GovProposal not found"}
 
       MapSet.member?(voters, sender_id) ->
         {:error, "Already voted"}
 
       true ->
-        case Proposal.get(db, proposal_id) do
+        case GovProposal.get(db, proposal_id) do
           {:ok, %{status: status}} when status != 0 ->
-            {:error, "Proposal already closed"}
+            {:error, "GovProposal already closed"}
 
-          {:ok, proposal} ->
+          {:ok, govproposal} ->
             new_voters = MapSet.put(voters, sender_id)
             Property.put(db, proposal_id, "voters", new_voters)
             result = Balance.incr(db, proposal_id, "#{vote}", 1)
@@ -92,22 +92,22 @@ defmodule Hashpay.Governance.Proposal.Command do
 
             cond do
               vote == 0 and result >= quorum ->
-                proposal = %{proposal | status: 2}
-                Proposal.put(db, proposal)
+                govproposal = %{govproposal | status: 2}
+                GovProposal.put(db, govproposal)
 
-                fun = Functions.get_by_name(proposal.action)
-                apply(fun.mod, fun.fun, [ctx | proposal.action_args])
+                fun = Functions.get_by_name(govproposal.action)
+                apply(fun.mod, fun.fun, [ctx | govproposal.action_args])
 
               vote == 1 and result >= quorum ->
-                proposal = %{proposal | status: 3}
-                Proposal.put(db, proposal)
+                govproposal = %{govproposal | status: 3}
+                GovProposal.put(db, govproposal)
 
               true ->
                 :ok
             end
 
           _error ->
-            {:error, "Proposal not found"}
+            {:error, "GovProposal not found"}
         end
     end
   end
@@ -117,21 +117,21 @@ defmodule Hashpay.Governance.Proposal.Command do
   def cancel(%{db: db, sender: %{id: sender_id}}, %{
         "proposal_id" => proposal_id
       }) do
-    case Proposal.get(db, proposal_id) do
-      {:ok, proposal} ->
+    case GovProposal.get(db, proposal_id) do
+      {:ok, govproposal} ->
         cond do
-          proposal.status != 0 ->
-            {:error, "Proposal already closed"}
+          govproposal.status != 0 ->
+            {:error, "GovProposal already closed"}
 
-          proposal.proposer != sender_id ->
+          govproposal.proposer != sender_id ->
             {:error, "Invalid sender"}
 
           true ->
-            Proposal.change_status(db, proposal, 4)
+            GovProposal.change_status(db, govproposal, 4)
         end
 
       _error ->
-        {:error, "Proposal not found"}
+        {:error, "GovProposal not found"}
     end
   end
 end

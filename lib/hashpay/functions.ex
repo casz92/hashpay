@@ -366,7 +366,7 @@ defmodule Hashpay.Functions do
     %Function{
       id: 1300,
       name: "proposeGovernance",
-      mod: Hashpay.Governance.Proposal.Command,
+      mod: Hashpay.GovProposal.Command,
       fun: :propose,
       auth_type: 1,
       thread: :type_and_args
@@ -374,7 +374,7 @@ defmodule Hashpay.Functions do
     %Function{
       id: 1301,
       name: "voteGovernance",
-      mod: Hashpay.Governance.Proposal.Command,
+      mod: Hashpay.GovProposal.Command,
       fun: :vote,
       auth_type: 1,
       thread: :type_and_args
@@ -382,7 +382,7 @@ defmodule Hashpay.Functions do
     %Function{
       id: 1302,
       name: "cancelGovernance",
-      mod: Hashpay.Governance.Proposal.Command,
+      mod: Hashpay.GovProposal.Command,
       fun: :cancel,
       auth_type: 1,
       thread: :type_and_args

@@ -59,6 +59,14 @@ defmodule Hashpay.Currency do
     [@prefix, id] |> IO.iodata_to_binary()
   end
 
+  def dbopts do
+    [
+      name: @trdb,
+      handle: ~c"currencies",
+      exp: false
+    ]
+  end
+
   def new(
         attrs = %{
           "id" => id,
@@ -84,28 +92,14 @@ defmodule Hashpay.Currency do
     }
   end
 
-  def dbopts do
-    [
-      name: @trdb,
-      handle: ~c"currencies",
-      exp: false
-    ]
-  end
-
   def init(tr) do
-    if exists?(tr, @default_currency) do
-      default =
-        %{
-          "ticker" => @default_currency,
-          "name" => "Hashpay",
-          "pubkey" => nil,
-          "decimals" => 6,
-          "symbol" => "ℏ",
-          "max_supply" => 500_000_000_000_000_000_000
-        }
-        |> new()
+    unless exists?(tr, @default_currency) do
+      first_currency = Application.get_env(:hashpay, :first_currency)
 
-      ThunderRAM.put(tr, @trdb, default.id, default)
+      default = new(first_currency)
+
+      tr = ThunderRAM.new_batch(tr)
+      put(tr, default)
 
       Property.put(tr, default.id, %{
         "mint" => true,
@@ -117,7 +111,15 @@ defmodule Hashpay.Currency do
         "payday_max_to_claim" => 60,
         "paystream_withdrawal_fee" => 0.01
       })
+
+      ThunderRAM.sync(tr)
     end
+
+    load_all(tr)
+  end
+
+  def load_all(tr) do
+    ThunderRAM.load_all(tr, @trdb)
   end
 
   def get(tr, id) do
@@ -126,6 +128,7 @@ defmodule Hashpay.Currency do
 
   def put(tr, %__MODULE__{} = currency) do
     ThunderRAM.put(tr, @trdb, currency.id, currency)
+    ThunderRAM.count_one(tr, @trdb)
   end
 
   def exists?(tr, id) do
@@ -135,7 +138,7 @@ defmodule Hashpay.Currency do
   def merge(tr, id, attrs) do
     case get(tr, id) do
       {:ok, currency} ->
-        currency = Map.merge(currency, struct(__MODULE__, attrs))
+        currency = Map.merge(currency, attrs)
         ThunderRAM.put(tr, @trdb, currency.id, currency)
 
       _ ->
@@ -145,9 +148,14 @@ defmodule Hashpay.Currency do
 
   def delete(tr, %__MODULE__{} = currency) do
     ThunderRAM.delete(tr, @trdb, currency.id)
+    ThunderRAM.discount_one(tr, @trdb)
   end
 
   def delete(tr, id) do
     ThunderRAM.delete(tr, @trdb, id)
+  end
+
+  def total(tr) do
+    ThunderRAM.total(tr, @trdb)
   end
 end

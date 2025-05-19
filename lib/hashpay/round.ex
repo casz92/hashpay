@@ -246,13 +246,36 @@ defmodule Hashpay.Round do
 
   def put(tr, %__MODULE__{} = round) do
     ThunderRAM.put(tr, @trdb, round.id, round)
+    ThunderRAM.put(tr, @trdb, "$last", round)
+    ThunderRAM.count_one(tr, @trdb)
   end
 
   def delete(tr, %__MODULE__{} = round) do
     ThunderRAM.delete(tr, @trdb, round.id)
+    ThunderRAM.discount_one(tr, @trdb)
   end
 
   def delete(tr, id) do
     ThunderRAM.delete(tr, @trdb, id)
+  end
+
+  def last(tr) do
+    case get(tr, "$last") do
+      {:ok, round} -> round
+      _ -> nil
+    end
+  end
+
+  def total(tr) do
+    case ThunderRAM.get(tr, @trdb, "$count") do
+      {:ok, count} -> count
+      _ -> 0
+    end
+  end
+
+  def to_struct(data = %__MODULE__{}), do: data
+
+  def to_struct(data) do
+    struct(__MODULE__, data)
   end
 end

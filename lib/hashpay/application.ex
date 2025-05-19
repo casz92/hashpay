@@ -23,11 +23,12 @@ defmodule Hashpay.Application do
     children = [
       {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
       :poolboy.child_spec(:event_consumer_pool, get_env(:event_consumer_pool, nil)),
-      {RoundEventConsumer, []},
       Hashpay.Cache,
+      {Hashpay.Roundchain, []},
       # PubSub para comunicación entre procesos
       Hashpay.PubSub,
       {Hashpay.Cluster, name: :cluster},
+      # {RoundTimer, []},
       # Conexión a ScyllaDB
       # {Hashpay.DB, db_opts},
       # {Hashpay.Redis, get_env(:redis, [])},
