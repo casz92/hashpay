@@ -54,3 +54,4 @@ priv/data
 *.obj
 *.exe
 *.db
+*.hosts

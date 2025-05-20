@@ -28,16 +28,23 @@ defmodule Hashpay.Router do
   alias Hashpay.Command
 
   post "/v1/call" do
-    {:ok, body, _conn} = read_body(conn)
-    command = Command.decode(body)
+    try do
+      {:ok, body, _conn} = read_body(conn)
+      command = Command.decode(body)
 
-    case Command.handle(command) do
-      {:error, reason} ->
+      case Command.handle(command) do
+        {:error, reason} ->
+          Logger.error("Error handling command: #{reason}")
+          send_resp(conn, 400, reason)
+
+        _ ->
+          send_resp(conn, 200, "OK")
+      end
+    rescue
+      e ->
+        reason = Exception.message(e)
         Logger.error("Error handling command: #{reason}")
         send_resp(conn, 400, reason)
-
-      _ ->
-        send_resp(conn, 200, "OK")
     end
   end
 
@@ -136,7 +143,7 @@ defmodule Hashpay.Router do
       |> send_file(200, "priv/html/websocket_example.html")
     end
 
-    get "/ws" do
+    get "/example/ws" do
       conn = fetch_query_params(conn)
       user_id = Map.get(conn.params, "user_id", "anonymous")
       channel = Map.get(conn.params, "channel", "lobby")

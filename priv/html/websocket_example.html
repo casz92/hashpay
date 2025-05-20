@@ -188,7 +188,7 @@
             addSystemMessage(`Conectando al canal: ${channel}...`);
 
             // Crear nueva conexión WebSocket
-            socket = new WebSocket(`ws://${window.location.host}/ws?user_id=${userId}&channel=${channel}`);
+            socket = new WebSocket(`ws://${window.location.host}/example/ws?user_id=${userId}&channel=${channel}`);
 
             socket.onopen = () => {
                 connectionStatus.textContent = `Estado: Conectado (ID: ${userId}, Canal: ${channel})`;

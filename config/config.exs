@@ -15,6 +15,7 @@ import_config "genesis.exs"
 # Configuración del validador
 config :hashpay, :channel, "first"
 config :hashpay, :threads, System.schedulers_online()
+config :hashpay, :quorum, type: "relative", limit: 10
 
 # ID del validador
 config :hashpay, :id, "v_1UmjkVzfksJHu4UqEohMFB"
@@ -76,9 +77,9 @@ config :hashpay, Oban,
     {Oban.Plugins.Cron,
      crontab: [
        # Diariamente a medianoche
-       {"0 0 * * *", Hashpay.Workers.DailyCleanup},
+       {"0 0 * * *", Hashpay.Workers.DailyCleanup}
        # Cada 15 minutos
-      #  {"*/15 * * * *", Hashpay.Workers.PeriodicCheck}
+       #  {"*/15 * * * *", Hashpay.Workers.PeriodicCheck}
      ]}
   ],
   queues: [default: 10, background: 5, critical: 3],

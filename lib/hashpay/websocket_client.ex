@@ -173,12 +173,12 @@ defmodule Hashpay.WebSocketClient do
   def websocket_handle({:text, msg}, _ConnState, state) do
     Logger.debug("Mensaje recibido: #{msg}")
 
-    try do
-      decoded_message = Jason.decode!(msg)
-      handle_received_message(decoded_message, state)
-    rescue
-      e ->
-        Logger.error("Error al decodificar mensaje JSON: #{inspect(e)}")
+    case Jason.decode(msg) do
+      {:ok, decoded_message} ->
+        handle_received_message(decoded_message, &Jason.encode!/1, state)
+
+      {:error, reason} ->
+        Logger.error("Error al decodificar mensaje JSON: #{inspect(reason)}")
         {:ok, state}
     end
   end
@@ -186,6 +186,16 @@ defmodule Hashpay.WebSocketClient do
   @impl :websocket_client
   def websocket_handle({:binary, msg}, _ConnState, state) do
     Logger.debug("Mensaje binario recibido: #{inspect(msg)}")
+
+    case CBOR.decode(msg) do
+      {:ok, decoded_message, _} ->
+        handle_received_message(decoded_message, &CBOR.encode/1, state)
+
+      {:error, reason} ->
+        Logger.error("Error al decodificar mensaje CBOR: #{inspect(reason)}")
+        {:ok, state}
+    end
+
     {:ok, state}
   end
 
@@ -274,29 +284,39 @@ defmodule Hashpay.WebSocketClient do
 
   # Funciones privadas
 
-  defp handle_received_message(message, state) do
+  defp handle_received_message(message, encoder, state) do
     # Procesar el mensaje según su tipo
     case message do
-      %{"type" => "heartbeat"} ->
+      %{"id" => id, "method" => "heartbeat"} ->
         # Responder al heartbeat del servidor
-        response = %{
-          type: "heartbeat_ack",
-          timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
-          counter: state.counter
-        }
+        response = %{id: id, state: "ok"}
+        {:reply, {:text, encoder.(response)}, state}
 
-        {:reply, {:text, Jason.encode!(response)}, state}
+      %{"id" => id, "method" => _method} ->
+        # Pasar el mensaje al handler si existe
+        response =
+          if state.message_handler do
+            try do
+              case state.message_handler.(message) do
+                {:error, reason} ->
+                  %{id: id, state: "error", data: reason}
+
+                _ok ->
+                  %{id: id, state: "ok"}
+              end
+            rescue
+              e ->
+                reason = Exception.message(e)
+                Logger.error("Error en el handler de mensajes: #{reason}")
+                %{id: id, state: "error", data: reason}
+            end
+          else
+            %{id: id, state: "error", data: "No handler"}
+          end
+
+        {:reply, {:text, encoder.(response)}, state}
 
       _ ->
-        # Pasar el mensaje al handler si existe
-        if state.message_handler do
-          try do
-            state.message_handler.(message)
-          rescue
-            e -> Logger.error("Error en el handler de mensajes: #{inspect(e)}")
-          end
-        end
-
         {:ok, state}
     end
   end

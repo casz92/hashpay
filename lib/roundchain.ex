@@ -32,6 +32,7 @@ defmodule Hashpay.Roundchain do
   @round_time Application.compile_env(:hashpay, :round_time, 500)
   @default_channel Application.compile_env(:hashpay, :default_channel)
   @default_currency Application.compile_env(:hashpay, :default_currency)
+  @supply "@supply"
 
   ## Public API
 
@@ -59,6 +60,7 @@ defmodule Hashpay.Roundchain do
       :validators,
       :pubkey,
       :privkey,
+      :replicants,
       :sync_state,
       :me,
       :commands,
@@ -96,6 +98,7 @@ defmodule Hashpay.Roundchain do
         me: me,
         pubkey: pubkey,
         privkey: privkey,
+        replicants: :ets.new(:replicants, [:set, :named_table, :public]),
         sync_state: :syncing,
         vrounds: :ets.new(:virtual_rounds, [:bag]),
         commands: :ets.new(:commands, [:ordered_set])
@@ -155,7 +158,7 @@ defmodule Hashpay.Roundchain do
 
       # check votes
       total = :ets.info(validators, :size)
-      min_votes = (div(total, 2) + 1) |> min(10)
+      min_votes = quorum_fn(total)
 
       if result >= min_votes do
         Logger.debug("Round ##{round.id} has enough votes")
@@ -228,6 +231,33 @@ defmodule Hashpay.Roundchain do
           {acc, size}
       end
     end
+
+    @quorum_config Application.compile_env(:hashpay, :quorum)
+    @quorum_type Keyword.get(@quorum_config, :type, "majority")
+    @quorum_limit Keyword.get(@quorum_config, :limit, 20_000)
+
+    case @quorum_type do
+      "majority" ->
+        def quorum_fn(total), do: min(div(total, 2) + 1, @quorum_limit)
+
+      "relative" ->
+        def quorum_fn(total), do: min(div(total, 3) + 1, @quorum_limit)
+
+      "1/3" ->
+        def quorum_fn(total), do: min(div(total, 3), @quorum_limit)
+
+      "2/3" ->
+        def quorum_fn(total), do: min(div(total, 3) * 2, @quorum_limit)
+
+      "3/4" ->
+        def quorum_fn(total), do: min(div(total, 4) * 3, @quorum_limit)
+
+      "absolute" ->
+        def quorum_fn(total), do: total
+
+      _ ->
+        raise("Invalid quorum type")
+    end
   end
 
   @doc false
@@ -235,6 +265,20 @@ defmodule Hashpay.Roundchain do
   def init(_opts) do
     vid = Application.get_env(:hashpay, :id)
     seed = Application.get_env(:hashpay, :privkey)
+
+    replicants =
+      File.exists?("replicants.hosts")
+      |> then(fn exists ->
+        if exists do
+          File.read!("replicants.hosts")
+          |> String.split("\n")
+          |> Enum.map(&String.trim/1)
+          |> Enum.filter(&(&1 != ""))
+        else
+          Logger.warning("No replicants.hosts file found")
+          []
+        end
+      end)
 
     EventBus.subscribe(
       {__MODULE__,
@@ -255,6 +299,11 @@ defmodule Hashpay.Roundchain do
 
     tr = load_db()
     state = State.new(tr, vid, seed)
+
+    replicants
+    |> Enum.each(fn hostname ->
+      :ets.insert(state.replicants, {hostname, %{}})
+    end)
 
     {:ok, state, {:continue, :start}}
   end
@@ -279,9 +328,10 @@ defmodule Hashpay.Roundchain do
           on_round_published(event_data, state)
 
         :round_received ->
-          from = Map.get(event_data, "from", nil)
-          round = event_data["data"] |> Round.to_struct()
-          on_round_received(round, from, state)
+          from = event_data["from"]
+          round = event_data["round"] |> Round.to_struct()
+          from_signature = event_data["signature"]
+          on_round_received(round, from, from_signature, state)
 
         :round_verified ->
           round = Round.to_struct(event_data)
@@ -372,12 +422,8 @@ defmodule Hashpay.Roundchain do
           )
 
         db = ThunderRAM.new_batch(db)
+        round = round_reward(db, round)
         Round.put(db, round)
-
-        if round.reward > 0 do
-          Logger.debug("Round reward: #{inspect(round.reward)}")
-          Balance.incr(db, new_state.turnof.id, @default_currency, round.reward)
-        end
 
         for block <- blocks do
           Block.put(db, block)
@@ -404,25 +450,21 @@ defmodule Hashpay.Roundchain do
   end
 
   defp on_round_received(
-         %Round{creator: creator_id},
-         _from_id,
-         %State{me: me}
-       )
-       when creator_id == me.id do
-    :ok
-  end
-
-  defp on_round_received(
          round = %Round{creator: creator_id},
          from_id,
-         %State{db: db, prev: prev_round} = state
-       ) do
+         from_signature,
+         %State{db: db, prev: prev_round, me: me} = state
+       )
+       when creator_id != me.id do
     Logger.debug("Round received: ##{inspect(round.id)} | #{inspect(round.creator)}")
     RoundTimer.finish_round_timeout()
 
     try do
-      case Validator.get(db, creator_id) do
-        {:ok, creator} ->
+      {:ok, creator} = Validator.get(db, creator_id)
+      {:ok, from} = Validator.get(db, from_id)
+
+      case Cafezinho.Impl.verify(from_signature, round.hash, from.pubkey) do
+        true ->
           publish_round_received(round)
 
           if not State.has_virtual_round(state, round) do
@@ -449,8 +491,10 @@ defmodule Hashpay.Roundchain do
     end
   end
 
+  defp on_round_received(_round, _from_id, _signature, _state), do: :ok
+
   defp on_round_accepted(round, state = %State{db: db}) do
-    Logger.debug("Round accepted: ##{inspect(round.id)}")
+    # Logger.debug("Round accepted: ##{inspect(round.id)}")
     db = ThunderRAM.new_batch(db)
     round = %{round | status: 1}
     Round.put(db, round)
@@ -484,7 +528,7 @@ defmodule Hashpay.Roundchain do
   end
 
   defp on_round_skipped(state = %State{db: db, me: me}) do
-    Logger.debug("Round skipped: ##{inspect(state.id)}")
+    # Logger.debug("Round skipped: ##{inspect(state.id)}")
 
     db = ThunderRAM.new_batch(db)
     round = Round.new_skipped(state.id, state.prev.hash, state.turnof.id, state.privkey)
@@ -531,6 +575,32 @@ defmodule Hashpay.Roundchain do
 
   defp publish_round_timeout(round) do
     PubSub.broadcast_from(@default_channel, %{"event" => "round_timeout", "data" => round})
+  end
+
+  defp round_reward(_db, round) when round.reward == 0 do
+    round
+  end
+
+  defp round_reward(db, round) do
+    Logger.debug("Round reward: #{inspect(round.reward)}")
+
+    case Currency.get(db, @default_currency) do
+      {:ok, currency} ->
+        max_supply = currency.max_supply
+        amount = round.reward
+
+        case Balance.incr_limit(db, currency.id, @supply, amount, max_supply) do
+          {:ok, _new_amount} ->
+            Balance.incr(db, round.creator, @default_currency, round.reward)
+            round
+
+          _error ->
+            %{round | reward: 0}
+        end
+
+      _error ->
+        %{round | reward: 0}
+    end
   end
 
   defp load_db do
