@@ -29,3 +29,12 @@ config :hashpay, :broadway,
   batchers: [
     default: [concurrency: 1, batch_size: 5]
   ]
+
+# Configuración de Ecto y SQLite3 para pruebas
+config :hashpay, Hashpay.Repo,
+  database: Path.expand("../priv/data/tasks_test.db", Path.dirname(__ENV__.file)),
+  pool: Ecto.Adapters.SQL.Sandbox
+
+# Configuración de Oban para pruebas (modo testing)
+config :hashpay, Oban,
+  testing: :inline

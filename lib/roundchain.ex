@@ -31,6 +31,7 @@ defmodule Hashpay.Roundchain do
 
   @round_time Application.compile_env(:hashpay, :round_time, 500)
   @default_channel Application.compile_env(:hashpay, :default_channel)
+  @default_currency Application.compile_env(:hashpay, :default_currency)
 
   ## Public API
 
@@ -359,6 +360,11 @@ defmodule Hashpay.Roundchain do
 
         db = ThunderRAM.new_batch(db)
         Round.put(db, round)
+
+        if round.reward > 0 do
+          Logger.debug("Round reward: #{inspect(round.reward)}")
+          Balance.incr(db, new_state.turnof.id, @default_currency, round.reward)
+        end
 
         for block <- blocks do
           Block.put(db, block)

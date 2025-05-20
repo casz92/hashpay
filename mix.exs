@@ -48,6 +48,8 @@ defmodule Hashpay.MixProject do
         :poolboy,
         :xandra,
         :postgrex,
+        :ecto_sqlite3,
+        :oban,
         :runtime_tools,
         :bandit,
         :plug,
@@ -83,6 +85,12 @@ defmodule Hashpay.MixProject do
 
       # PostgreSQL driver
       {:postgrex, "~> 0.17.3"},
+
+      # Oban - Sistema de trabajos en segundo plano
+      {:oban, "~> 2.16"},
+
+      # SQLite para Oban
+      {:ecto_sqlite3, "~> 0.10.3"},
 
       # Broadway - Procesamiento de datos concurrente
       # {:broadway, "~> 1.2.1"},

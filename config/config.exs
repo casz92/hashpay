@@ -35,16 +35,6 @@ config :hashpay, :event_consumer_pool,
 
 config :event_bus,
   topics: [
-    # :account_created,
-    # :account_updated,
-    # :account_deleted,
-    # :account_verified,
-    # :balance_changed,
-    # :currency_updated,
-    # :currency_deleted,
-    # :variable_set,
-    # :variable_deleted,
-
     :block_created,
     :block_uploaded,
     :block_published,
@@ -53,12 +43,11 @@ config :event_bus,
     :block_verifying,
     :block_failed,
     :block_completed,
-    :round_created,
-    :round_published,
+    :round_start,
     :round_received,
+    :round_published,
     :round_verified,
     :round_failed,
-    :round_started,
     :round_timeout,
     :round_skipped,
     :round_ended,
@@ -68,6 +57,32 @@ config :event_bus,
   ]
 
 config :ex_aws, json_codec: Jason
+
+# Configuración de Ecto y SQLite3
+config :hashpay, ecto_repos: [Hashpay.Repo]
+
+config :hashpay, Hashpay.Repo,
+  adapter: Ecto.Adapters.SQLite3,
+  database: Path.expand("../priv/data/tasks.db", Path.dirname(__ENV__.file)),
+  pool_size: 5
+
+# Configuración de Oban
+config :hashpay, Oban,
+  repo: Hashpay.Repo,
+  engine: Oban.Engines.Lite,
+  plugins: [
+    # 7 días
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+    {Oban.Plugins.Cron,
+     crontab: [
+       # Diariamente a medianoche
+       {"0 0 * * *", Hashpay.Workers.DailyCleanup},
+       # Cada 15 minutos
+      #  {"*/15 * * * *", Hashpay.Workers.PeriodicCheck}
+     ]}
+  ],
+  queues: [default: 10, background: 5, critical: 3],
+  peer: false
 
 # Importar configuraciones específicas del entorno
 import_config "#{config_env()}.exs"

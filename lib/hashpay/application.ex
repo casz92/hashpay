@@ -19,6 +19,9 @@ defmodule Hashpay.Application do
     # Inicializar estado
     init_state()
 
+    # Asegurar que el directorio para la base de datos SQLite exista
+    File.mkdir_p!(Path.dirname(Application.get_env(:hashpay, Hashpay.Repo)[:database]))
+
     # Configuración para HTTP
     children = [
       {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
@@ -34,6 +37,9 @@ defmodule Hashpay.Application do
       # {Hashpay.Redis, get_env(:redis, [])},
       # Conexión a PostgreSQL
       # {Postgrex, get_env(:postgres, [])},
+      # Repo para SQLite y Oban
+      Hashpay.Repo,
+      {Oban, Application.get_env(:hashpay, Oban)},
       # Servidor HTTP
       {Bandit, plug: Hashpay.Router, port: http_port, startup_log: :debug},
 
@@ -108,7 +114,9 @@ defmodule Hashpay.Application do
     data_folder = Application.get_env(:hashpay, :data_folder)
 
     [
-      Path.join(data_folder, "blocks")
+      Path.join(data_folder, "blocks"),
+      # Directorio para la base de datos SQLite
+      "priv/data"
     ]
     |> Enum.each(&File.mkdir_p!/1)
   end
