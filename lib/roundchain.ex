@@ -478,7 +478,7 @@ defmodule Hashpay.Roundchain do
   end
 
   defp on_round_ended(round, state = %State{db: db}) do
-    Logger.debug("Round ended: ##{inspect(state.id)}")
+    Logger.info("Round ended: \e[31m##{inspect(state.id)}\e[0m")
 
     new_state =
       %{state | db: ThunderRAM.sync(db)}

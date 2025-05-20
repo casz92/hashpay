@@ -128,6 +128,7 @@ defmodule Hashpay.MixProject do
 
       # Event bus - Dispatcher de eventos
       {:event_bus, "~> 1.7.0"},
+
       # eredis - Cliente para Redis
       {:eredis, "~> 1.7"},
       {:blake3, "~> 1.0"},
