@@ -15,7 +15,7 @@ import_config "genesis.exs"
 # Configuración del validador
 config :hashpay, :channel, "first"
 config :hashpay, :threads, System.schedulers_online()
-config :hashpay, :quorum, type: "relative", limit: 10
+config :hashpay, :quorum, type: "1/3", limit: 10
 
 # ID del validador
 config :hashpay, :id, "v_1UmjkVzfksJHu4UqEohMFB"

@@ -237,14 +237,14 @@ defmodule Hashpay.Roundchain do
     @quorum_limit Keyword.get(@quorum_config, :limit, 20_000)
 
     case @quorum_type do
+      "1/3" ->
+        def quorum_fn(total), do: min(div(total, 3), @quorum_limit)
+
       "majority" ->
         def quorum_fn(total), do: min(div(total, 2) + 1, @quorum_limit)
 
       "relative" ->
         def quorum_fn(total), do: min(div(total, 3) + 1, @quorum_limit)
-
-      "1/3" ->
-        def quorum_fn(total), do: min(div(total, 3), @quorum_limit)
 
       "2/3" ->
         def quorum_fn(total), do: min(div(total, 3) * 2, @quorum_limit)
