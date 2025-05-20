@@ -125,7 +125,8 @@ defmodule Hashpay.Roundchain do
 
     def add_virtual_round(
           %__MODULE__{validators: validators, vrounds: vrounds, turnof: turnof},
-          round
+          round,
+          from_id
         )
         when round.creator == turnof.id do
       key = {round.id, round.hash}
@@ -134,11 +135,22 @@ defmodule Hashpay.Roundchain do
         :ets.lookup(vrounds, round.id)
         |> case do
           [] ->
-            :ets.insert(vrounds, {key, round, 1})
+            :ets.insert(vrounds, {key, round, MapSet.new([from_id]), 1})
             1
 
-          [{^key, _, count}] ->
-            :ets.update_element(vrounds, key, {3, count + 1})
+          [{^key, _, unique_voters, count}] ->
+            if not MapSet.member?(unique_voters, from_id) do
+              result = count + 1
+
+              :ets.update_element(vrounds, key, [
+                {3, MapSet.put(unique_voters, from_id)},
+                {4, result}
+              ])
+
+              result
+            else
+              count
+            end
         end
 
       # check votes
@@ -153,12 +165,12 @@ defmodule Hashpay.Roundchain do
       end
     end
 
-    def add_virtual_round(_state, _round), do: :skip
+    def add_virtual_round(_state, _round, _from), do: :skip
 
     def clean_vrounds(state = %__MODULE__{vrounds: vrounds, id: round_id}) do
       :ets.foldl(
         fn
-          {key = {rid, _rhash}, _round, _count}, acc when rid == round_id ->
+          {key = {rid, _rhash}, _round, _voters, _count}, acc when rid <= round_id ->
             :ets.delete(vrounds, key)
             acc
 
@@ -267,8 +279,9 @@ defmodule Hashpay.Roundchain do
           on_round_published(event_data, state)
 
         :round_received ->
-          round = Round.to_struct(event_data)
-          on_round_received(round, state)
+          from = Map.get(event_data, "from", nil)
+          round = event_data["data"] |> Round.to_struct()
+          on_round_received(round, from, state)
 
         :round_verified ->
           round = Round.to_struct(event_data)
@@ -392,6 +405,7 @@ defmodule Hashpay.Roundchain do
 
   defp on_round_received(
          %Round{creator: creator_id},
+         _from_id,
          %State{me: me}
        )
        when creator_id == me.id do
@@ -400,6 +414,7 @@ defmodule Hashpay.Roundchain do
 
   defp on_round_received(
          round = %Round{creator: creator_id},
+         from_id,
          %State{db: db, prev: prev_round} = state
        ) do
     Logger.debug("Round received: ##{inspect(round.id)} | #{inspect(round.creator)}")
@@ -420,7 +435,7 @@ defmodule Hashpay.Roundchain do
                   on_round_failed(round, state)
               end
 
-            if State.add_virtual_round(state, round) == :ok do
+            if State.add_virtual_round(state, round, from_id) == :ok do
               on_round_accepted(round, state)
             end
           end
@@ -468,7 +483,7 @@ defmodule Hashpay.Roundchain do
     on_round_ended(round, new_state)
   end
 
-  defp on_round_skipped(state = %State{db: db}) do
+  defp on_round_skipped(state = %State{db: db, me: me}) do
     Logger.debug("Round skipped: ##{inspect(state.id)}")
 
     db = ThunderRAM.new_batch(db)
@@ -478,7 +493,7 @@ defmodule Hashpay.Roundchain do
 
     publish_round_created(round)
 
-    if State.add_virtual_round(new_state, round) == :ok do
+    if State.add_virtual_round(new_state, round, me.id) == :ok do
       on_round_accepted(round, new_state)
     end
   end
