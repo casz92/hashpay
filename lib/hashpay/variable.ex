@@ -9,7 +9,7 @@ defmodule Hashpay.Variable do
   """
   @trdb :variables
 
-  @compile {:inline, [put: 3, get: 2, delete: 2]}
+  @compile {:inline, [put: 3, get: 1, get: 2, delete: 2]}
 
   defstruct [:key, :value]
 
@@ -49,57 +49,9 @@ defmodule Hashpay.Variable do
     :persistent_term.get({:var, "validator_withdrawal_fee"}, 0.01)
   end
 
-  def put_factor_a(tr, value) do
-    :persistent_term.put({:var, "factor_a"}, value)
-    ThunderRAM.put(tr, @trdb, "factor_a", value)
-  end
-
-  def put_factor_b(tr, value) do
-    :persistent_term.put({:var, "factor_b"}, value)
-    ThunderRAM.put(tr, @trdb, "factor_b", value)
-  end
-
-  def put_round_rewarded_base(tr, value) do
-    :persistent_term.put({:var, "round_rewarded_base"}, value)
-    ThunderRAM.put(tr, @trdb, "round_rewarded_base", value)
-  end
-
-  def put_round_rewarded_transactions(tr, value) do
-    :persistent_term.put({:var, "round_rewarded_transactions"}, value)
-    ThunderRAM.put(tr, @trdb, "round_rewarded_transactions", value)
-  end
-
-  def put_round_size_target(tr, value) do
-    :persistent_term.put({:var, "round_size_target"}, value)
-    ThunderRAM.put(tr, @trdb, "round_size_target", value)
-  end
-
-  def put_currency_creation_cost(tr, value) do
-    :persistent_term.put({:var, "currency_creation_cost"}, value)
-    ThunderRAM.put(tr, @trdb, "currency_creation_cost", value)
-  end
-
-  def put_validator_creation_cost(tr, value) do
-    :persistent_term.put({:var, "validator_creation_cost"}, value)
-    ThunderRAM.put(tr, @trdb, "validator_creation_cost", value)
-  end
-
-  def put_merchant_creation_cost(tr, value) do
-    :persistent_term.put({:var, "merchant_creation_cost"}, value)
-    ThunderRAM.put(tr, @trdb, "merchant_creation_cost", value)
-  end
-
-  def put_validator_withdrawal_fee(tr, value) do
-    :persistent_term.put({:var, "validator_withdrawal_fee"}, value)
-    ThunderRAM.put(tr, @trdb, "validator_withdrawal_fee", value)
-  end
-
   def init(tr) do
-    case get(tr, "factor_a") do
-      {:ok, _value} ->
-        :ignore
-
-      _ ->
+    case get("factor_a") do
+      nil ->
         tr = ThunderRAM.new_batch(tr)
         ThunderRAM.put(tr, @trdb, "factor_a", 1)
         ThunderRAM.put(tr, @trdb, "factor_b", 0)
@@ -111,6 +63,9 @@ defmodule Hashpay.Variable do
         ThunderRAM.put(tr, @trdb, "merchant_creation_cost", 10_000_000)
         ThunderRAM.put(tr, @trdb, "validator_withdrawal_fee", 0.005)
         ThunderRAM.sync(tr)
+
+      _value ->
+        :ignore
     end
 
     load_all(tr)
@@ -130,15 +85,37 @@ defmodule Hashpay.Variable do
     ]
   end
 
-  def get(tr, key) do
-    ThunderRAM.get(tr, @trdb, key)
+  def get(key) do
+    :persistent_term.get({:var, key}, nil)
+  end
+
+  def get(key, default) do
+    :persistent_term.get({:var, key}, default)
   end
 
   def put(tr, key, value) do
-    ThunderRAM.put(tr, @trdb, key, value)
+    is_valid =
+      case key do
+        "factor_a" -> is_integer(value)
+        "factor_b" -> is_integer(value)
+        "round_rewarded_base" -> is_integer(value)
+        "round_rewarded_transactions" -> is_float(value)
+        "round_size_target" -> is_float(value)
+        "currency_creation_cost" -> is_number(value)
+        "validator_creation_cost" -> is_number(value)
+        "merchant_creation_cost" -> is_number(value)
+        "validator_withdrawal_fee" -> is_float(value)
+        _ -> true
+      end
+
+    if is_valid do
+      :persistent_term.put({:var, key}, value)
+      ThunderRAM.put(tr, @trdb, key, value)
+    end
   end
 
   def delete(tr, key) do
+    :persistent_term.erase({:var, key})
     ThunderRAM.delete(tr, @trdb, key)
   end
 end
