@@ -56,7 +56,7 @@ defmodule Hashpay.Router do
   end
 
   # Ruta para WebSockets
-  get "/v1/ws" do
+  get "/v1/public/ws" do
     conn = fetch_query_params(conn)
     sender = Map.get(conn.params, "sender")
     channel = Map.get(conn.params, "channel")
@@ -84,14 +84,14 @@ defmodule Hashpay.Router do
       :ok ->
         conn
         |> WebSockAdapter.upgrade(
-          Hashpay.WebSocketClientHandler,
+          Hashpay.Public.Handler,
           [sender: sender, channel: channel],
           timeout: 120_000
         )
         |> halt()
 
       {:error, reason} ->
-        Logger.error("Invalid signature for sender: #{sender}")
+        Logger.debug("Invalid signature for sender: #{sender}")
 
         conn
         |> send_resp(401, reason)
@@ -100,10 +100,10 @@ defmodule Hashpay.Router do
   end
 
   if Application.compile_env(:hashpay, :enable_cluster, true) do
-    get "/v1/cluster/pubsub" do
+    get "/v1/cluster/ws" do
       conn = fetch_query_params(conn)
       name = Map.get(conn.params, "name")
-      challenge = Map.get(conn.params, "challenge") |> Base.decode16!()
+      challenge = Map.get(conn.params, "challenge") |> DateTime.from_iso8601()
       signature = Map.get(conn.params, "signature") |> Base.decode16!()
 
       with false <- is_nil(name),
@@ -112,7 +112,7 @@ defmodule Hashpay.Router do
 
         conn
         |> WebSockAdapter.upgrade(
-          Hashpay.ClusterBrokerHandler,
+          Hashpay.Cluster.Handler,
           [node: node],
           timeout: 150_000
         )

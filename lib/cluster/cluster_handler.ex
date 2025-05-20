@@ -1,4 +1,4 @@
-defmodule Hashpay.ClusterBrokerHandler do
+defmodule Hashpay.Cluster.Handler do
   @moduledoc """
   Manejador de mensajes para el broker de mensajes del cluster.
   """

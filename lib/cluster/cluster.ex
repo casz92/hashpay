@@ -39,9 +39,34 @@ defmodule Hashpay.Cluster do
     :ets.delete(:cluster_members, member_id)
   end
 
+  defp verify_challenge(challenge) do
+    t = DateTime.utc_now(:millisecond)
+
+    if DateTime.diff(t, challenge, :millisecond) < 30_000 do
+      true
+    else
+      false
+    end
+  end
+
+  @spec get_and_authenticate(String.t(), binary(), binary()) ::
+          {:ok, term()} | {:error, atom()}
   def get_and_authenticate(name, message, signature) do
     conn = Hashpay.DB.get_conn()
-    ClusterNode.get_and_authenticate(conn, name, message, signature)
+    case ClusterNode.get(conn, name) do
+      {:ok, node} ->
+        if verify_challenge(message) do
+          case Cafezinho.Impl.verify(signature, message, node.pubkey) do
+            true -> {:ok, node}
+            false -> {:error, :invalid_signature}
+          end
+        else
+          {:error, :invalid_challenge}
+        end
+
+      error ->
+        error
+    end
   end
 
   def members do

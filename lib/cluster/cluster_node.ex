@@ -150,47 +150,6 @@ defmodule Hashpay.ClusterNode do
     end
   end
 
-  @nonce_max 99_999_999
-  def generate_challenge(node_id) do
-    timestamp = System.system_time(:second)
-    # Genera un número aleatorio ≤ 99,999,999
-    nonce = :rand.uniform(@nonce_max)
-    "#{node_id}|#{timestamp}|#{nonce}"
-  end
-
-  def verify_challenge(challenge, expected_node_id) do
-    case String.split(challenge, "|") do
-      [node_id, timestamp_str, nonce_str] ->
-        timestamp = String.to_integer(timestamp_str)
-        nonce = String.to_integer(nonce_str)
-        current_time = System.system_time(:second)
-
-        valid_timestamp = abs(current_time - timestamp) <= 30
-        valid_node_id = node_id == expected_node_id
-        valid_nonce = nonce > 0 and nonce <= @nonce_max
-
-        valid_timestamp and valid_node_id and valid_nonce
-
-      _ ->
-        false
-    end
-  end
-
-  @spec get_and_authenticate(Xandra.conn(), String.t(), binary(), binary()) ::
-          t() | nil
-  def get_and_authenticate(conn, name, message, signature) do
-    case get_by_name(conn, name) do
-      {:ok, node} ->
-        case Cafezinho.Impl.verify(signature, message, node.pubkey) do
-          true -> {:ok, node}
-          false -> {:error, :invalid_signature}
-        end
-
-      error ->
-        error
-    end
-  end
-
   def row_to_struct(row) do
     %__MODULE__{
       id: row["id"],
