@@ -21,6 +21,9 @@ defmodule Mix.Tasks.Hpay do
       "certs" ->
         Mix.Tasks.Certs.run(rest)
 
+      "replicants" ->
+        Mix.Tasks.Replicants.run(rest)
+
       x when x == "version" or x == "v" ->
         IO.puts("""
         Hashpay version v#{Application.spec(:hashpay, :vsn)}

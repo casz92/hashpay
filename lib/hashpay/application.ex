@@ -39,7 +39,8 @@ defmodule Hashpay.Application do
       # {Postgrex, get_env(:postgres, [])},
       # Repo para SQLite y Oban
       Hashpay.Repo,
-      {Oban, Application.get_env(:hashpay, Oban)},
+      {Oban, get_env(Oban)},
+      {Udp, get_env(Hashpay.UdpCLI)},
       # Servidor HTTP
       {Bandit, plug: Hashpay.Router, port: http_port, startup_log: :debug},
 
@@ -98,6 +99,10 @@ defmodule Hashpay.Application do
   end
 
   # Función auxiliar para obtener configuración del entorno
+  defp get_env(key) do
+    Application.get_env(:hashpay, key)
+  end
+
   defp get_env(key, default) do
     case Application.get_env(:hashpay, key) do
       nil -> default

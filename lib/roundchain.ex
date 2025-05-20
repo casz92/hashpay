@@ -29,7 +29,8 @@ defmodule Hashpay.Roundchain do
     GovProposal
   }
 
-  @round_time Application.compile_env(:hashpay, :round_time, 500)
+  # Application.compile_env(:hashpay, :round_time, 500)
+  @round_time 15_000
   @default_channel Application.compile_env(:hashpay, :default_channel)
   @default_currency Application.compile_env(:hashpay, :default_currency)
   @supply "@supply"
@@ -266,20 +267,6 @@ defmodule Hashpay.Roundchain do
     vid = Application.get_env(:hashpay, :id)
     seed = Application.get_env(:hashpay, :privkey)
 
-    replicants =
-      File.exists?("replicants.hosts")
-      |> then(fn exists ->
-        if exists do
-          File.read!("replicants.hosts")
-          |> String.split("\n")
-          |> Enum.map(&String.trim/1)
-          |> Enum.filter(&(&1 != ""))
-        else
-          Logger.warning("No replicants.hosts file found")
-          []
-        end
-      end)
-
     EventBus.subscribe(
       {__MODULE__,
        [
@@ -300,12 +287,32 @@ defmodule Hashpay.Roundchain do
     tr = load_db()
     state = State.new(tr, vid, seed)
 
-    replicants
-    |> Enum.each(fn hostname ->
-      :ets.insert(state.replicants, {hostname, %{}})
-    end)
+    load_replicants()
 
     {:ok, state, {:continue, :start}}
+  end
+
+  def load_replicants do
+    replicants =
+      if File.exists?("replicants.hosts") do
+        File.read!("replicants.hosts")
+        |> String.split("\n")
+        |> Enum.map(&String.trim/1)
+        |> Enum.filter(&(&1 != ""))
+        |> Enum.uniq()
+      else
+        Logger.warning("No replicants.hosts file found")
+        []
+      end
+
+    :ets.delete_all_objects(:replicants)
+
+    replicants
+    |> Enum.each(fn hostname ->
+      :ets.insert(:replicants, {hostname, %{}})
+    end)
+
+    Logger.info("Replicants loaded: #{length(replicants)}")
   end
 
   @impl true

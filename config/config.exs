@@ -85,5 +85,10 @@ config :hashpay, Oban,
   queues: [default: 10, background: 5, critical: 3],
   peer: false
 
+config :hashpay, Hashpay.UdpCLI,
+  ip: {127, 0, 0, 1},
+  port: 27_100,
+  handler: Hashpay.UdpCLI
+
 # Importar configuraciones específicas del entorno
 import_config "#{config_env()}.exs"
