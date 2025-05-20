@@ -19,8 +19,14 @@ config :hashpay, :hashnumber, hashnumber
 config :hashpay, :pubkey, pubkey
 config :hashpay, :default_currency, "cu_HPY"
 config :hashpay, :default_channel, default_channel
-config :hashpay, :round_time, 500
-config :hashpay, :round_timeout, 1_500
+
+if Mix.env() == :prod do
+  config :hashpay, :round_time, 500
+  config :hashpay, :round_timeout, 1_500
+else
+  config :hashpay, :round_time, 20_000
+  config :hashpay, :round_timeout, 10_000
+end
 
 config :hashpay, :first_validator, %{
   "pubkey" => Base.encode64(pubkey),

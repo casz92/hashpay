@@ -29,8 +29,7 @@ defmodule Hashpay.Roundchain do
     GovProposal
   }
 
-  # Application.compile_env(:hashpay, :round_time, 500)
-  @round_time 15_000
+  @round_time Application.compile_env(:hashpay, :round_time)
   @default_channel Application.compile_env(:hashpay, :default_channel)
   @default_currency Application.compile_env(:hashpay, :default_currency)
   @supply "@supply"
