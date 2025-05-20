@@ -106,7 +106,11 @@ defmodule Hashpay.Validator do
   def init(tr) do
     if count(tr) == 0 do
       first_val = Application.get_env(:hashpay, :first_validator)
-      validator = new(first_val)
+
+      validator =
+        new(first_val)
+        |> Map.put(:active, true)
+
       tr = ThunderRAM.new_batch(tr)
       put_new(tr, validator)
       ThunderRAM.sync(tr)
@@ -121,6 +125,10 @@ defmodule Hashpay.Validator do
 
   def load_all(tr) do
     ThunderRAM.load_all(tr, @trdb)
+  end
+
+  def foreach(tr, fun) do
+    ThunderRAM.foreach(tr, @trdb, fun)
   end
 
   def get(tr, id) do

@@ -279,7 +279,7 @@ defmodule ThunderRAM do
   end
 
   defp incr_from_db(tr, ets, name, key) do
-    unless :ets.member(ets, key) do
+    if not :ets.member(ets, key) do
       case get_from_db(tr, name, key) do
         {:ok, value} -> :ets.insert(ets, {key, value})
         _ -> false

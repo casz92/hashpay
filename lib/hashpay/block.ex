@@ -20,6 +20,7 @@ defmodule Hashpay.Block do
   - vsn: Versión del formato de bloque
   """
   @trdb :blocks
+  @block_version Application.compile_env(:hashpay, :block_version, 1)
 
   @enforce_keys [
     :creator,
@@ -96,7 +97,10 @@ defmodule Hashpay.Block do
   """
   def new(attrs, private_key) when is_map(attrs) do
     # Asegurarse de que timestamp esté presente
-    attrs = Map.put_new_lazy(attrs, :timestamp, fn -> System.os_time(:millisecond) end)
+    attrs =
+      attrs
+      |> Map.put_new_lazy(:timestamp, fn -> System.os_time(:millisecond) end)
+      |> Map.put(:vsn, @block_version)
 
     # Crear un bloque sin hash ni firma
     block_without_hash = struct!(__MODULE__, attrs)
@@ -126,7 +130,7 @@ defmodule Hashpay.Block do
     ]
 
     # Unir los campos y calcular el hash
-    <<hash::192, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields, "|"))
+    <<hash::binary-24, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields, "|"))
 
     [<<block.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end
@@ -235,7 +239,35 @@ defmodule Hashpay.Block do
   end
 
   def put(tr, %__MODULE__{} = block) do
+    ThunderRAM.put(tr, @trdb, Integer.to_string(block.id), block)
+    ThunderRAM.count_one(tr, @trdb)
+  end
+
+  def put_local(tr, %__MODULE__{} = block) do
     ThunderRAM.put(tr, @trdb, block.id, block)
+    ThunderRAM.put(tr, @trdb, "$last", block)
+
+    vid = Application.get_env(:hashpay, :id)
+
+    if block.creator == vid do
+      ThunderRAM.put(tr, @trdb, "$local", block)
+    end
+
+    ThunderRAM.count_one(tr, @trdb)
+  end
+
+  def last(tr) do
+    case get(tr, "$last") do
+      {:ok, block} -> block
+      _ -> nil
+    end
+  end
+
+  def local(tr) do
+    case get(tr, "$local") do
+      {:ok, block} -> block
+      _ -> nil
+    end
   end
 
   def delete(tr, %__MODULE__{} = block) do

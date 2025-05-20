@@ -93,7 +93,7 @@ defmodule Hashpay.Currency do
   end
 
   def init(tr) do
-    unless exists?(tr, @default_currency) do
+    if not exists?(tr, @default_currency) do
       first_currency = Application.get_env(:hashpay, :first_currency)
 
       default = new(first_currency)

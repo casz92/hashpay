@@ -1,6 +1,9 @@
 defmodule Hashpay.Blockfile do
-  def encode(txs) do
-    CBOR.encode(%{"txs" => txs, "vsn" => 1})
+  @version 1
+  @hash_module Blake3.Native
+
+  def encode(commands) do
+    CBOR.encode(%{"txs" => commands, "vsn" => @version})
   end
 
   def decode!(encoded_block) do
@@ -10,9 +13,24 @@ defmodule Hashpay.Blockfile do
     end
   end
 
+  def build(block_id, commands) do
+    encoded_block = encode(commands)
+    save(encoded_block, block_id)
+    # upload(block_id)
+  end
+
   def save(encoded_block, block_id) do
     path = pathfile(block_id)
     File.write!(path, encoded_block)
+  end
+
+  def compute_hash(block_id) do
+    path = pathfile(block_id)
+    state = @hash_module.new()
+
+    File.stream!(path, [], 2048)
+    |> Enum.reduce(state, &@hash_module.update(&2, &1))
+    |> @hash_module.finalize()
   end
 
   def upload(block_id) do

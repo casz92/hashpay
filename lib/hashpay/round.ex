@@ -13,7 +13,7 @@ defmodule Hashpay.Round do
   - count: Contador de bloques en la ronda
   - txs: Contador total de transacciones en la ronda
   - size: Tamaño de la ronda en bytes
-  - status: Estado de la ronda (0: pendiente, 1: confirmada, 2: rechazada, 3: finalizada)
+  - status: Estado de la ronda (0: pending, 1: confirmed, 2: skipped, 3: rejected, 4: timeout)
   - timestamp: Marca de tiempo de creación
   - blocks: Lista de hashes de bloques incluidos en la ronda
   - vsn: Versión del formato de la ronda
@@ -22,19 +22,7 @@ defmodule Hashpay.Round do
   alias Hashpay.Round
 
   @trdb :rounds
-
-  @enforce_keys [
-    :id,
-    :hash,
-    :creator,
-    :reward,
-    :count,
-    :txs,
-    :size,
-    :status,
-    :timestamp,
-    :vsn
-  ]
+  @round_version Application.compile_env(:hashpay, :round_version, 1)
 
   defstruct [
     :id,
@@ -109,7 +97,51 @@ defmodule Hashpay.Round do
     {:ok, signature} = Cafezinho.Impl.sign(hash, private_key)
 
     # Añadir hash y firma a la ronda
-    %{round_without_hash | hash: hash, signature: signature}
+    %{
+      round_without_hash
+      | hash: hash,
+        signature: signature,
+        reward: calc_reward(round_without_hash)
+    }
+  end
+
+  def new_cancelled(round = %Round{}) do
+    %{round | status: 3}
+  end
+
+  def new_timeout(round_id, prev_round_hash, creator_id) do
+    round = %__MODULE__{
+      id: round_id,
+      prev: prev_round_hash,
+      creator: creator_id,
+      reward: 0,
+      count: 0,
+      txs: 0,
+      size: 0,
+      status: 4,
+      timestamp: System.os_time(:millisecond),
+      blocks: [],
+      vsn: @round_version
+    }
+
+    hash = calculate_hash(round)
+    %{round | hash: hash}
+  end
+
+  def new_skipped(round_id, prev_round_hash, creator_id, privkey) do
+    %{
+      id: round_id,
+      prev: prev_round_hash,
+      creator: creator_id,
+      reward: 0,
+      count: 0,
+      txs: 0,
+      size: 0,
+      status: 2,
+      blocks: [],
+      vsn: @round_version
+    }
+    |> new(privkey)
   end
 
   @doc """
@@ -136,7 +168,7 @@ defmodule Hashpay.Round do
       end
 
     # Unir los campos y calcular el hash
-    <<hash::192, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields ++ block_hashes, "|"))
+    <<hash::binary-24, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields ++ block_hashes, "|"))
 
     [<<round.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end
@@ -245,7 +277,7 @@ defmodule Hashpay.Round do
   end
 
   def put(tr, %__MODULE__{} = round) do
-    ThunderRAM.put(tr, @trdb, round.id, round)
+    ThunderRAM.put(tr, @trdb, Integer.to_string(round.id), round)
     ThunderRAM.put(tr, @trdb, "$last", round)
     ThunderRAM.count_one(tr, @trdb)
   end

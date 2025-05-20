@@ -4,6 +4,8 @@ defmodule Hashpay.Roundchain do
   use GenServer
   require Logger
 
+  alias Hashpay.{PubSub, Blockfile}
+
   alias Hashpay.{
     Variable,
     Currency,
@@ -28,7 +30,7 @@ defmodule Hashpay.Roundchain do
   }
 
   @round_time Application.compile_env(:hashpay, :round_time, 500)
-  @round_timeout Application.compile_env(:hashpay, :round_timeout, 1_500)
+  @default_channel Application.compile_env(:hashpay, :default_channel)
 
   ## Public API
 
@@ -52,14 +54,16 @@ defmodule Hashpay.Roundchain do
       :prev,
       :turnof,
       :db,
-      :blocks,
+      :candidates,
+      :validators,
       :pubkey,
       :privkey,
       :sync_state,
       :me,
       :commands,
-      :tref,
-      :vrounds
+      :vrounds,
+      :myheight,
+      :myturn
     ]
 
     def new(db, vid, seed) do
@@ -70,51 +74,102 @@ defmodule Hashpay.Roundchain do
         end
 
       {:ok, {pubkey, privkey}} = Cafezinho.Impl.keypair_from_seed(seed)
-      last_round = Round.last(db) || %{id: -1}
+      last_round = Round.last(db) || %{id: -1, hash: nil}
+
+      # Load active validators
+      validators = :ets.new(:validators, [:ordered_set])
+
+      Validator.foreach(db, fn id, validator ->
+        if String.first(id) != "$" and validator.active do
+          :ets.insert(validators, {id, validator})
+        end
+      end)
 
       %__MODULE__{
         id: last_round.id + 1,
         prev: last_round,
         turnof: nil,
         db: db,
-        blocks: [],
+        candidates: :ets.new(:candidates, [:set, :named_table, :public]),
+        validators: validators,
         me: me,
         pubkey: pubkey,
         privkey: privkey,
         sync_state: :syncing,
-        tref: nil,
         vrounds: :ets.new(:virtual_rounds, [:bag]),
         commands: :ets.new(:commands, [:ordered_set])
       }
-
-      # |> put_next_validator()
     end
 
     def next_round(state = %__MODULE__{id: id}, round) do
       %{state | id: id + 1, prev: round}
     end
 
-    def put_next_validator(state = %__MODULE__{db: db, id: round_id}) do
+    def put_next_validator(
+          state = %__MODULE__{db: db, id: round_id, me: me, validators: validators}
+        ) do
       total = Validator.total(db)
+      if total == 0, do: raise("No validators")
       hash = Hashpay.hash("the next round ##{round_id} goes to") |> :binary.decode_unsigned()
       i = rem(hash, total)
-      validator = Validator.slot(db, i)
+      [{_validator_id, validator}] = :ets.slot(validators, i)
 
-      %{state | turnof: validator}
+      %{state | turnof: validator, myturn: me != nil and validator.id == me.id}
     end
 
-    def add_virtual_round(%__MODULE__{vrounds: vrounds, turnof: turnof}, round)
+    def has_virtual_round(state, round) do
+      key = {round.id, round.hash}
+      :ets.member(state.vrounds, key)
+    end
+
+    def add_virtual_round(
+          %__MODULE__{validators: validators, vrounds: vrounds, turnof: turnof},
+          round
+        )
         when round.creator == turnof.id do
       key = {round.id, round.hash}
 
-      :ets.lookup(vrounds, round.id)
-      |> case do
-        [] -> :ets.insert(vrounds, {key, round, 1})
-        [{^key, _, count}] -> :ets.update_element(vrounds, key, {3, count + 1})
+      result =
+        :ets.lookup(vrounds, round.id)
+        |> case do
+          [] ->
+            :ets.insert(vrounds, {key, round, 1})
+            1
+
+          [{^key, _, count}] ->
+            :ets.update_element(vrounds, key, {3, count + 1})
+        end
+
+      # check votes
+      total = :ets.info(validators, :size)
+      min_votes = (div(total, 2) + 1) |> min(10)
+
+      if result >= min_votes do
+        Logger.debug("Round ##{round.id} has enough votes")
+        :ok
+      else
+        :skip
       end
     end
 
-    def add_virtual_round(state, _round), do: state
+    def add_virtual_round(_state, _round), do: :skip
+
+    def clean_vrounds(state = %__MODULE__{vrounds: vrounds, id: round_id}) do
+      :ets.foldl(
+        fn
+          {key = {rid, _rhash}, _round, _count}, acc when rid == round_id ->
+            :ets.delete(vrounds, key)
+            acc
+
+          _, acc ->
+            acc
+        end,
+        [],
+        vrounds
+      )
+
+      state
+    end
 
     def get_most_voted_round(%__MODULE__{vrounds: vrounds, id: round_id}) do
       result =
@@ -138,6 +193,28 @@ defmodule Hashpay.Roundchain do
 
       result.round
     end
+
+    @max_block_size 4 * 1024 * 1024
+    def get_commands(%__MODULE__{commands: commands}) do
+      do_get_commands(commands, :ets.first(commands), 0, [])
+    end
+
+    defp do_get_commands(ets, key, size, acc) do
+      case :ets.lookup(ets, key) do
+        [{^key, item}] ->
+          new_size = size + item.size
+          :ets.delete(ets, key)
+
+          if new_size >= @max_block_size do
+            {acc, new_size}
+          else
+            do_get_commands(ets, :ets.next(ets, key), new_size, [item | acc])
+          end
+
+        _ ->
+          {acc, size}
+      end
+    end
   end
 
   @doc false
@@ -150,12 +227,10 @@ defmodule Hashpay.Roundchain do
       {__MODULE__,
        [
          :round_start,
-         :round_created,
          :round_received,
          :round_published,
          :round_verified,
          :round_failed,
-         :round_started,
          :round_timeout,
          :round_skipped,
          :round_ended,
@@ -173,23 +248,7 @@ defmodule Hashpay.Roundchain do
 
   @impl true
   def handle_continue(:start, state) do
-    tref = Process.send_after(self(), :round_time, @round_time)
-
-    {:noreply, %{state | tref: tref}}
-  end
-
-  @impl true
-  def handle_info(:round_time, state) do
-    tref = Process.send_after(self(), :round_timeout, @round_timeout)
-
-    {:noreply, %{state | tref: tref}}
-  end
-
-  @impl true
-  def handle_info(:round_timeout, state) do
-    tref = Process.send_after(self(), :round_time, @round_time)
-
-    {:noreply, %{state | tref: tref}}
+    {:noreply, on_round_start(state)}
   end
 
   @doc false
@@ -201,10 +260,7 @@ defmodule Hashpay.Roundchain do
     new_state =
       case topic do
         :round_start ->
-          on_round_start(event_data, state)
-
-        :round_created ->
-          on_round_created(event_data, state)
+          on_round_start(state)
 
         :round_published ->
           on_round_published(event_data, state)
@@ -221,17 +277,15 @@ defmodule Hashpay.Roundchain do
           round = Round.to_struct(event_data)
           on_round_failed(round, state)
 
-        :round_started ->
-          on_round_started(event_data, state)
-
         :round_timeout ->
-          on_round_timeout(event_data, state)
+          on_round_timeout(state)
 
         :round_skipped ->
-          on_round_skipped(event_data, state)
+          on_round_skipped(state)
 
         :round_ended ->
-          on_round_ended(event_data, state)
+          round = Round.to_struct(event_data)
+          on_round_ended(round, state)
 
         :validator_created ->
           on_validator_created(event_data, state)
@@ -250,92 +304,212 @@ defmodule Hashpay.Roundchain do
   @doc false
   @impl true
   def terminate(reason, _state) do
-    IO.puts("Roundchain terminated: #{inspect(reason)}")
+    Logger.debug("Roundchain terminated: #{inspect(reason)}")
     EventBus.unsubscribe(__MODULE__)
   end
 
-  defp on_round_start(event_data, state) do
-    Logger.info("Round start: #{inspect(event_data)}")
+  defp on_round_start(state = %State{db: db, privkey: privkey}) do
+    Logger.debug("Round start: ##{inspect(state.id)}")
 
     new_state =
       state
       |> State.put_next_validator()
 
-    RoundTimer.start_round_time()
+    if new_state.myturn do
+      {commands, _size} = State.get_commands(new_state)
+      cmds_count = length(commands)
 
-    new_state
-  end
+      if cmds_count == 0 do
+        :timer.sleep(@round_time - 100)
+        on_round_skipped(new_state)
+      else
+        Blockfile.build(new_state.id, commands)
 
-  defp on_round_created(event_data, _state) do
-    Logger.info("Round created: #{inspect(event_data)}")
-    RoundTimer.finish_round_timeout()
+        blocks = [
+          Block.new(
+            %{
+              id: new_state.myheight,
+              creator: new_state.turnof.id,
+              channel: @default_channel,
+              height: new_state.myheight,
+              prev: new_state.prev.hash,
+              count: cmds_count,
+              rejected: 0,
+              size: Enum.sum(Enum.map(commands, & &1.size)),
+              status: 1
+            },
+            privkey
+          )
+        ]
+
+        round =
+          Round.new(
+            %{
+              id: new_state.id,
+              prev: new_state.prev.hash,
+              creator: new_state.turnof.id,
+              count: length(blocks),
+              txs: Enum.sum(Enum.map(blocks, & &1.count)),
+              size: Enum.sum(Enum.map(blocks, & &1.size)),
+              status: 0,
+              blocks: Enum.map(blocks, & &1.hash)
+            },
+            privkey
+          )
+
+        db = ThunderRAM.new_batch(db)
+        Round.put(db, round)
+
+        for block <- blocks do
+          Block.put(db, block)
+        end
+
+        # EventBus.notify(%Event{
+        #   id: :round_created,
+        #   topic: :round_created,
+        #   data: round
+        # })
+
+        publish_round_created(round)
+
+        %{new_state | db: db}
+      end
+    else
+      RoundTimer.start_round_time()
+      new_state
+    end
   end
 
   defp on_round_published(event_data, _state) do
-    Logger.info("Round published: #{inspect(event_data)}")
+    Logger.debug("Round published: #{inspect(event_data)}")
+  end
+
+  defp on_round_received(
+         %Round{creator: creator_id},
+         %State{me: me}
+       )
+       when creator_id == me.id do
+    :ok
   end
 
   defp on_round_received(
          round = %Round{creator: creator_id},
-         %State{db: _db, prev: prev_round} = state
+         %State{db: db, prev: prev_round} = state
        ) do
-    Logger.info("Round received: #{inspect(round)}")
+    Logger.debug("Round received: ##{inspect(round.id)} | #{inspect(round.creator)}")
     RoundTimer.finish_round_timeout()
 
     try do
-      case Validator.get(creator_id, prev_round) do
-        {:ok, validator} ->
-          case Round.validate(round, validator.pubkey) do
-            {:ok, round} ->
-              on_round_verified(round, state)
+      case Validator.get(db, creator_id) do
+        {:ok, creator} ->
+          publish_round_received(round)
 
-            _error ->
-              on_round_failed(round, state)
+          if not State.has_virtual_round(state, round) do
+            round =
+              case Round.validate(round, prev_round, creator.pubkey) do
+                {:ok, round} ->
+                  on_round_verified(round, state)
+
+                _error ->
+                  on_round_failed(round, state)
+              end
+
+            if State.add_virtual_round(state, round) == :ok do
+              on_round_accepted(round, state)
+            end
           end
 
-        error ->
-          error
+        _error ->
+          :ok
       end
     rescue
       _ ->
-        on_round_failed(round, state)
+        :ok
     end
   end
 
-  defp on_round_verified(%{blocks: _blocks} = round, _state) do
-    Logger.info("Round verified: #{inspect(round)}")
+  defp on_round_accepted(round, state = %State{db: db}) do
+    Logger.debug("Round accepted: ##{inspect(round.id)}")
+    db = ThunderRAM.new_batch(db)
+    round = %{round | status: 1}
+    Round.put(db, round)
+    new_state = %{state | db: db}
+    on_round_ended(round, new_state)
   end
 
-  defp on_round_failed(event_data, _state) do
-    Logger.info("Round failed: #{inspect(event_data)}")
+  defp on_round_verified(round, _state) do
+    Logger.debug("Round verified: #{inspect(round.id)}")
+    # db = ThunderRAM.new_batch(db)
+    # Round.put(db, round)
+    # new_state = %{state | db: db}
+    # on_round_ended(round, new_state)
+    round
   end
 
-  defp on_round_started(event_data, _state) do
-    Logger.info("Round started: #{inspect(event_data)}")
+  defp on_round_failed(round, _state) do
+    Logger.debug("Round failed: ##{inspect(round.id)}")
+    Round.new_cancelled(round)
   end
 
-  defp on_round_timeout(event_data, _state) do
-    Logger.info("Round timeout: #{inspect(event_data)}")
+  defp on_round_timeout(state = %State{db: db}) do
+    Logger.debug("Round timeout: ##{inspect(state.id)}")
+
+    db = ThunderRAM.new_batch(db)
+    round = Round.new_timeout(state.id, state.prev.hash, state.turnof.id)
+    Round.put(db, round)
+    new_state = %{state | db: db}
+    publish_round_timeout(round)
+    on_round_ended(round, new_state)
   end
 
-  defp on_round_skipped(event_data, _state) do
-    Logger.info("Round skipped: #{inspect(event_data)}")
+  defp on_round_skipped(state = %State{db: db}) do
+    Logger.debug("Round skipped: ##{inspect(state.id)}")
+
+    db = ThunderRAM.new_batch(db)
+    round = Round.new_skipped(state.id, state.prev.hash, state.turnof.id, state.privkey)
+    Round.put(db, round)
+    new_state = %{state | db: db}
+
+    publish_round_created(round)
+
+    if State.add_virtual_round(new_state, round) == :ok do
+      on_round_accepted(round, new_state)
+    end
   end
 
-  defp on_round_ended(event_data, _state) do
-    Logger.info("Round ended: #{inspect(event_data)}")
+  defp on_round_ended(round, state = %State{db: db}) do
+    Logger.debug("Round ended: ##{inspect(state.id)}")
+
+    new_state =
+      %{state | db: ThunderRAM.sync(db)}
+      |> State.next_round(round)
+      |> State.clean_vrounds()
+
+    on_round_start(new_state)
   end
 
   defp on_validator_created(event_data, _state) do
-    Logger.info("Validator created: #{inspect(event_data)}")
+    Logger.debug("Validator created: #{inspect(event_data)}")
   end
 
   defp on_validator_updated(event_data, _state) do
-    Logger.info("Validator updated: #{inspect(event_data)}")
+    Logger.debug("Validator updated: #{inspect(event_data)}")
   end
 
   defp on_validator_deleted(event_data, _state) do
-    Logger.info("Validator deleted: #{inspect(event_data)}")
+    Logger.debug("Validator deleted: #{inspect(event_data)}")
+  end
+
+  defp publish_round_created(round) do
+    PubSub.broadcast_from(@default_channel, %{"event" => "round_created", "data" => round})
+  end
+
+  defp publish_round_received(round) do
+    PubSub.broadcast_from(@default_channel, %{"event" => "round_received", "data" => round})
+  end
+
+  defp publish_round_timeout(round) do
+    PubSub.broadcast_from(@default_channel, %{"event" => "round_timeout", "data" => round})
   end
 
   defp load_db do

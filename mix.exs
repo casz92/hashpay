@@ -13,7 +13,8 @@ defmodule Hashpay.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       # Agregar configuración de releases
-      releases: releases()
+      releases: releases(),
+      escript: escript()
     ]
   end
 
@@ -56,6 +57,10 @@ defmodule Hashpay.MixProject do
         :event_bus
       ]
     ]
+  end
+
+  defp escript do
+    [main_module: Hashpay.CLI]
   end
 
   # Run "mix help deps" to learn about dependencies.
