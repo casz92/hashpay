@@ -19,6 +19,8 @@ defmodule Hashpay.Block do
   - status: Estado del bloque (entero)
   - vsn: Versión del formato de bloque
   """
+  import Hashpay, only: [hash: 1]
+
   @trdb :blocks
   @block_version Application.compile_env(:hashpay, :block_version, 1)
 
@@ -130,7 +132,7 @@ defmodule Hashpay.Block do
     ]
 
     # Unir los campos y calcular el hash
-    <<hash::binary-24, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields, "|"))
+    <<hash::binary-24, _rest::binary>> = hash(Enum.join(fields, "|"))
 
     [<<block.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end

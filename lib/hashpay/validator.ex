@@ -17,6 +17,8 @@ defmodule Hashpay.Validator do
   - creation: Marca de tiempo de creación del validador
   - updated: Marca de tiempo de última actualización del validador
   """
+  import Hashpay, only: [hash: 1]
+
   @type t :: %__MODULE__{
           id: String.t(),
           hostname: String.t(),
@@ -58,7 +60,7 @@ defmodule Hashpay.Validator do
   @compile {:inline, [put: 2, put_new: 2, exists?: 2, delete: 2, total: 1, slot: 2]}
 
   def generate_id(pubkey) do
-    <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
+    <<first16bytes::binary-16, _rest::binary>> = hash(pubkey)
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
   end
 

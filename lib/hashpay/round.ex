@@ -20,6 +20,7 @@ defmodule Hashpay.Round do
   """
   alias Hashpay.Variable
   alias Hashpay.Round
+  import Hashpay, only: [hash: 1]
 
   @trdb :rounds
   @round_version Application.compile_env(:hashpay, :round_version, 1)
@@ -168,7 +169,7 @@ defmodule Hashpay.Round do
       end
 
     # Unir los campos y calcular el hash
-    <<hash::binary-24, _rest::binary>> = :crypto.hash(:sha256, Enum.join(fields ++ block_hashes, "|"))
+    <<hash::binary-24, _rest::binary>> = hash(Enum.join(fields ++ block_hashes, "|"))
 
     [<<round.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end

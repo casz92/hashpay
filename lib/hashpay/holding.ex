@@ -10,6 +10,8 @@ defmodule Hashpay.Holding do
   - apr: Tasa de rendimiento anual del holding
   - creation: Marca de tiempo de creación del holding
   """
+  import Hashpay, only: [hash: 1]
+
   @type t :: %__MODULE__{
           id: String.t(),
           account_id: String.t(),
@@ -40,7 +42,7 @@ defmodule Hashpay.Holding do
     hash =
       [account_id, currency_id, Float.to_string(apr)]
       |> Enum.join("|")
-      |> :crypto.hash(:sha256)
+      |> hash()
       |> :binary.part(0, 16)
       |> Base62.encode()
 

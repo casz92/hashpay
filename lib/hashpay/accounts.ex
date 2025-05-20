@@ -1,6 +1,7 @@
 defmodule Hashpay.Account do
   alias Hashpay.Account
   alias Hashpay.AccountName
+  import Hashpay, only: [hash: 1]
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -35,7 +36,7 @@ defmodule Hashpay.Account do
   end
 
   def generate_id(pubkey) do
-    <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
+    <<first16bytes::binary-16, _rest::binary>> = hash(pubkey)
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
   end
 

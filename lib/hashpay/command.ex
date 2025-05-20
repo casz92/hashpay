@@ -35,6 +35,7 @@ defmodule Hashpay.Command do
   alias Hashpay.Account
   alias Hashpay.Function.Context
   alias Hashpay.Functions
+  import Hashpay, only: [hash: 1]
 
   def new(attrs, size) do
     %__MODULE__{
@@ -57,10 +58,6 @@ defmodule Hashpay.Command do
   def decode(json) do
     Jason.decode!(json)
     |> new(byte_size(json))
-  end
-
-  def hash(command) do
-    :crypto.hash(:sha256, encode(command))
   end
 
   defp put_hash(command) do

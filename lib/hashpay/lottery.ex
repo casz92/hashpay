@@ -21,6 +21,8 @@ defmodule Hashpay.Lottery do
   - verification_url: URL de verificación de la lotería
   - creation: Marca de tiempo de creación de la lotería
   """
+  import Hashpay, only: [hash: 1]
+
   @prefix "lt_"
   @regex ~r/^lt_[a-zA-Z0-9]$/
   @trdb :lotteries
@@ -54,7 +56,7 @@ defmodule Hashpay.Lottery do
     hash =
       [account_id, hash]
       |> Enum.join("|")
-      |> :crypto.hash(:sha256)
+      |> hash()
       |> :binary.part(0, 16)
       |> Base62.encode()
 

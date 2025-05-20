@@ -8,6 +8,7 @@ defmodule Hashpay.LotteryTicket do
   - number: Número del ticket
   - creation: Marca de tiempo de creación del ticket
   """
+  import Hashpay, only: [hash: 1]
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -33,7 +34,7 @@ defmodule Hashpay.LotteryTicket do
     hash =
       [lottery_id, account_id, number]
       |> Enum.join("|")
-      |> :crypto.hash(:sha256)
+      |> hash()
       |> :binary.part(0, 16)
       |> Base62.encode()
 

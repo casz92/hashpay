@@ -12,6 +12,8 @@ defmodule Hashpay.Merchant do
   - creation: Marca de tiempo de creación del comercio
   - updated: Marca de tiempo de última actualización del comercio
   """
+  import Hashpay, only: [hash: 1]
+
   @type t :: %__MODULE__{
           id: String.t(),
           name: String.t(),
@@ -41,7 +43,7 @@ defmodule Hashpay.Merchant do
   @trdb :merchants
 
   def generate_id(pubkey) do
-    <<first16bytes::binary-16, _rest::binary>> = :crypto.hash(:sha3_256, pubkey)
+    <<first16bytes::binary-16, _rest::binary>> = hash(pubkey)
     IO.iodata_to_binary([@prefix, Base62.encode(first16bytes)])
   end
 

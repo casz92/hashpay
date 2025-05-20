@@ -12,6 +12,7 @@ defmodule Hashpay.Plan do
   - description: Descripción del plan
   - creation: Marca de tiempo de creación del plan
   """
+  import Hashpay, only: [hash: 1]
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -49,7 +50,7 @@ defmodule Hashpay.Plan do
     hash =
       [merchant_id, currency_id, Integer.to_string(amount), Integer.to_string(period)]
       |> Enum.join("|")
-      |> :crypto.hash(:sha256)
+      |> hash()
       |> :binary.part(0, 16)
       |> Base62.encode()
 

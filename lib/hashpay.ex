@@ -56,7 +56,7 @@ defmodule Hashpay do
   end
 
   def hash(data) do
-    Blake3.hash(data)
+    Blake3.Native.hash(data)
   end
 
   def gen_address_from_pubkey(pubkey) do
@@ -66,7 +66,7 @@ defmodule Hashpay do
     tail =
       [
         :binary.encode_unsigned(time),
-        :crypto.hash(:sha256, pubkey) |> :binary.part(0, 20)
+        hash(pubkey) |> :binary.part(0, 20)
       ]
       |> IO.iodata_to_binary()
       |> Base62.encode()
