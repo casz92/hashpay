@@ -334,10 +334,10 @@ defmodule Hashpay.Roundchain do
           on_round_published(event_data, state)
 
         :round_received ->
-          from = event_data["from"]
-          round = event_data["round"] |> Round.to_struct()
-          from_signature = event_data["signature"]
-          on_round_received(round, from, from_signature, state)
+          from = event_data.from
+          signature = event_data.signature
+          round = event_data.round |> Round.to_struct()
+          on_round_received(round, signature, from, state)
 
         :round_verified ->
           round = Round.to_struct(event_data)
@@ -452,35 +452,42 @@ defmodule Hashpay.Roundchain do
 
   defp on_round_received(
          round = %Round{creator: creator_id},
-         from_id,
          from_signature,
-         %State{db: db, prev: prev_round, me: me} = state
+         %{id: from_id, pid: from_pid},
+         %State{db: db, prev: prev_round, me: %{id: me_id}, privkey: privkey} = state
        )
-       when creator_id != me.id do
+       when from_id != me_id do
     Logger.debug("Round received: ##{inspect(round.id)} | #{inspect(round.creator)}")
     RoundTimer.finish_round_timeout()
 
     try do
+      # me_round = creator_id == me.id
       {:ok, creator} = Validator.get(db, creator_id)
       {:ok, from} = Validator.get(db, from_id)
 
+      # Verify from signature
       case Cafezinho.Impl.verify(from_signature, round.hash, from.pubkey) do
         true ->
-          publish_round_received(round)
+          publish_round_received(from_pid, round, privkey)
+          not_has_vround = not State.has_virtual_round(state, round)
 
-          if not State.has_virtual_round(state, round) do
-            round =
+          passed =
+            if not_has_vround do
               case Round.validate(round, prev_round, creator.pubkey) do
                 {:ok, round} ->
                   on_round_verified(round, state)
+                  true
 
                 _error ->
                   on_round_failed(round, state)
+                  false
               end
-
-            if State.add_virtual_round(state, round, from_id) == :ok do
-              on_round_accepted(round, state)
+            else
+              true
             end
+
+          if passed and State.add_virtual_round(state, round, from_id) == :ok do
+            on_round_accepted(round, state)
           end
 
         _error ->
@@ -492,7 +499,7 @@ defmodule Hashpay.Roundchain do
     end
   end
 
-  defp on_round_received(_round, _from_id, _signature, _state), do: :ok
+  defp on_round_received(_round, _signature, _from, _state), do: :ignore
 
   defp on_round_accepted(round, state = %State{db: db}) do
     # Logger.debug("Round accepted: ##{inspect(round.id)}")
@@ -558,24 +565,42 @@ defmodule Hashpay.Roundchain do
     Logger.debug("Validator created: #{inspect(event_data)}")
   end
 
-  defp on_validator_updated(event_data, _state) do
-    Logger.debug("Validator updated: #{inspect(event_data)}")
+  defp on_validator_updated(
+         %{active: active, id: id} = object,
+         %State{validators: validators}
+       ) do
+    Logger.debug("Validator updated: ##{inspect(id)}")
+
+    if active do
+      :ets.insert(validators, {id, object})
+    else
+      :ets.delete(validators, id)
+    end
   end
 
-  defp on_validator_deleted(event_data, _state) do
-    Logger.debug("Validator deleted: #{inspect(event_data)}")
+  defp on_validator_updated(_, _), do: :ok
+
+  defp on_validator_deleted(%{id: id}, %State{validators: validators}) do
+    Logger.debug("Validator deleted: ##{inspect(id)}")
+    :ets.delete(validators, id)
   end
 
   defp publish_round_created(round) do
-    PubSub.broadcast_from(@default_channel, %{"event" => "round_created", "data" => round})
+    PubSub.broadcast_from(self(), @default_channel, %{"event" => "round_created", "data" => round})
   end
 
-  defp publish_round_received(round) do
-    PubSub.broadcast_from(@default_channel, %{"event" => "round_received", "data" => round})
+  defp publish_round_received(from_pid, round, privkey) do
+    PubSub.broadcast_from(from_pid, @default_channel, %{
+      "event" => "round_received",
+      "data" => %{
+        "round" => round,
+        "signature" => Cafezinho.Impl.sign(round.hash, privkey)
+      }
+    })
   end
 
   defp publish_round_timeout(round) do
-    PubSub.broadcast_from(@default_channel, %{"event" => "round_timeout", "data" => round})
+    PubSub.broadcast_from(self(), @default_channel, %{"event" => "round_timeout", "data" => round})
   end
 
   defp round_reward(_db, round) when round.reward == 0 do

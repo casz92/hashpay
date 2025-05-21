@@ -53,6 +53,10 @@ defmodule Hashpay.PubSub do
     Phoenix.PubSub.broadcast_from(@pubsub_name, self(), channel_name(channel), message)
   end
 
+  def broadcast_from(pid, channel, message) when is_pid(pid) do
+    Phoenix.PubSub.broadcast_from(@pubsub_name, pid, channel_name(channel), message)
+  end
+
   @doc """
   Publica un mensaje directo a un proceso específico.
   """
