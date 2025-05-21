@@ -160,8 +160,8 @@ defmodule Hashpay.Roundchain do
       total = :ets.info(validators, :size)
       min_votes = quorum_fn(total)
 
-      if result >= min_votes do
-        Logger.debug("Round ##{round.id} has enough votes")
+      if result == min_votes do
+        # Logger.debug("Round ##{round.id} has enough votes")
         :ok
       else
         :skip
@@ -238,19 +238,19 @@ defmodule Hashpay.Roundchain do
 
     case @quorum_type do
       "1/3" ->
-        def quorum_fn(total), do: min(div(total, 3), @quorum_limit)
+        def quorum_fn(total), do: min(ceil(total / 3), @quorum_limit)
 
       "majority" ->
-        def quorum_fn(total), do: min(div(total, 2) + 1, @quorum_limit)
+        def quorum_fn(total), do: min(ceil(total / 2) + 1, @quorum_limit)
 
       "relative" ->
-        def quorum_fn(total), do: min(div(total, 3) + 1, @quorum_limit)
+        def quorum_fn(total), do: min(ceil(total / 3) + 1, @quorum_limit)
 
       "2/3" ->
-        def quorum_fn(total), do: min(div(total, 3) * 2, @quorum_limit)
+        def quorum_fn(total), do: min(ceil(total / 3) * 2, @quorum_limit)
 
       "3/4" ->
-        def quorum_fn(total), do: min(div(total, 4) * 3, @quorum_limit)
+        def quorum_fn(total), do: min(ceil(total * 0.75), @quorum_limit)
 
       "absolute" ->
         def quorum_fn(total), do: total
@@ -378,19 +378,19 @@ defmodule Hashpay.Roundchain do
     EventBus.unsubscribe(__MODULE__)
   end
 
+  @round_sleep_skip @round_time - 100
+  @round_sleep_build @round_time - 200
   defp on_round_start(state = %State{db: db, privkey: privkey}) do
-    Logger.debug("Round start: ##{inspect(state.id)}")
+    # Logger.debug("Round start: ##{inspect(state.id)}")
 
-    new_state =
-      state
-      |> State.put_next_validator()
+    new_state = State.put_next_validator(state)
 
     if new_state.myturn do
       {commands, _size} = State.get_commands(new_state)
       cmds_count = length(commands)
 
       if cmds_count == 0 do
-        :timer.sleep(@round_time - 100)
+        :timer.sleep(@round_sleep_skip)
         on_round_skipped(new_state)
       else
         Blockfile.build(new_state.id, commands)
@@ -435,12 +435,7 @@ defmodule Hashpay.Roundchain do
           Block.put(db, block)
         end
 
-        # EventBus.notify(%Event{
-        #   id: :round_created,
-        #   topic: :round_created,
-        #   data: round
-        # })
-
+        :timer.sleep(@round_sleep_build)
         publish_round_created(round)
 
         %{new_state | db: db}

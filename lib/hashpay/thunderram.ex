@@ -264,6 +264,11 @@ defmodule ThunderRAM do
     end
   end
 
+  def put_db(%ThunderRAM{batch: batch, tables: tables}, name, key, value) do
+    %{handle: handle} = Map.get(tables, name)
+    :rocksdb.batch_put(batch, handle, key, term_to_binary(value))
+  end
+
   def get(tr = %ThunderRAM{tables: tables}, name, key) do
     %{ets: ets} = Map.get(tables, name)
 
@@ -360,7 +365,12 @@ defmodule ThunderRAM do
     :rocksdb.batch_delete(batch, handle, key)
   end
 
-  defp get_from_db(%ThunderRAM{db: db, tables: tables}, name, key) do
+  def delete_db(%ThunderRAM{batch: batch, tables: tables}, name, key) do
+    %{handle: handle} = Map.get(tables, name)
+    :rocksdb.batch_delete(batch, handle, key)
+  end
+
+  def get_from_db(%ThunderRAM{db: db, tables: tables}, name, key) do
     %{handle: handle, ets: ets, exp: exp} = Map.get(tables, name)
 
     case :rocksdb.get(db, handle, key, []) do
@@ -404,17 +414,26 @@ defmodule ThunderRAM do
     :rocksdb.snapshot(db)
   end
 
+  @spec release_snapshot(reference()) :: no_return()
   def release_snapshot(snapshot) do
     :rocksdb.release_snapshot(snapshot)
   end
 
-  @spec restore(t(), charlist()) :: :ok | {:error, term()}
-  def restore(%ThunderRAM{db: db}, target) do
-    case :rocksdb.open_backup_engine(target) do
-      {:ok, ref} ->
-        case :rocksdb.restore_db_from_latest_backup(db, target) do
-          :ok ->
-            :rocksdb.close_backup_engine(ref)
+  @spec restore(charlist(), charlist()) :: :ok | {:error, term()}
+  def restore(target, output) do
+    zip_file = IO.iodata_to_binary([target, ".zip"]) |> String.to_charlist()
+
+    case ZipUtil.extract(zip_file, target) do
+      {:ok, _} ->
+        case :rocksdb.open_backup_engine(target) do
+          {:ok, ref} ->
+            case :rocksdb.restore_db_from_latest_backup(ref, output) do
+              :ok ->
+                :rocksdb.close_backup_engine(ref)
+
+              {:error, _reason} = err ->
+                err
+            end
 
           {:error, _reason} = err ->
             err
@@ -425,13 +444,23 @@ defmodule ThunderRAM do
     end
   end
 
-  @spec backup(t(), charlist()) :: :ok | {:error, term()}
+  @spec backup(t(), charlist() | binary()) :: :ok | {:error, term()}
   def backup(%ThunderRAM{db: db}, target) do
     case :rocksdb.open_backup_engine(target) do
       {:ok, ref} ->
         case :rocksdb.create_new_backup(ref, db) do
           :ok ->
             :rocksdb.close_backup_engine(ref)
+            zip_file = IO.iodata_to_binary([target, ".zip"])
+
+            case ZipUtil.compress_folder(target, zip_file) do
+              {:ok, _} ->
+                File.rm_rf!(target)
+                :ok
+
+              {:error, _reason} = err ->
+                err
+            end
 
           {:error, _reason} = err ->
             err

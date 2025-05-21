@@ -274,22 +274,22 @@ defmodule Hashpay.Round do
   end
 
   def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+    ThunderRAM.get_from_db(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = round) do
-    ThunderRAM.put(tr, @trdb, Integer.to_string(round.id), round)
-    ThunderRAM.put(tr, @trdb, "$last", round)
+    ThunderRAM.put_db(tr, @trdb, Integer.to_string(round.id), round)
+    ThunderRAM.put_db(tr, @trdb, "$last", round)
     ThunderRAM.count_one(tr, @trdb)
   end
 
   def delete(tr, %__MODULE__{} = round) do
-    ThunderRAM.delete(tr, @trdb, round.id)
+    ThunderRAM.delete_db(tr, @trdb, round.id)
     ThunderRAM.discount_one(tr, @trdb)
   end
 
   def delete(tr, id) do
-    ThunderRAM.delete(tr, @trdb, id)
+    ThunderRAM.delete_db(tr, @trdb, id)
   end
 
   def last(tr) do

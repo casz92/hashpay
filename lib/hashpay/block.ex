@@ -20,6 +20,7 @@ defmodule Hashpay.Block do
   - vsn: Versión del formato de bloque
   """
   import Hashpay, only: [hash: 1]
+  import ThunderRAM, only: [key_merge: 2]
 
   @trdb :blocks
   @block_version Application.compile_env(:hashpay, :block_version, 1)
@@ -237,47 +238,33 @@ defmodule Hashpay.Block do
   end
 
   def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+    ThunderRAM.get_from_db(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = block) do
-    ThunderRAM.put(tr, @trdb, Integer.to_string(block.id), block)
+    ThunderRAM.put_db(tr, @trdb, Integer.to_string(block.id), block)
     ThunderRAM.count_one(tr, @trdb)
   end
 
   def put_local(tr, %__MODULE__{} = block) do
-    ThunderRAM.put(tr, @trdb, block.id, block)
-    ThunderRAM.put(tr, @trdb, "$last", block)
-
-    vid = Application.get_env(:hashpay, :id)
-
-    if block.creator == vid do
-      ThunderRAM.put(tr, @trdb, "$local", block)
-    end
-
+    ThunderRAM.put_db(tr, @trdb, block.id, block)
+    ThunderRAM.put_db(tr, @trdb, key_merge("$last", block.creator), block)
     ThunderRAM.count_one(tr, @trdb)
   end
 
-  def last(tr) do
-    case get(tr, "$last") do
-      {:ok, block} -> block
-      _ -> nil
-    end
-  end
-
-  def local(tr) do
-    case get(tr, "$local") do
+  def last(tr, vid) do
+    case get(tr, key_merge("$last", vid)) do
       {:ok, block} -> block
       _ -> nil
     end
   end
 
   def delete(tr, %__MODULE__{} = block) do
-    ThunderRAM.delete(tr, @trdb, block.id)
+    ThunderRAM.delete_db(tr, @trdb, block.id)
   end
 
   def delete(tr, id) do
-    ThunderRAM.delete(tr, @trdb, id)
+    ThunderRAM.delete_db(tr, @trdb, id)
   end
 
   def to_struct(data = %__MODULE__{}), do: data
