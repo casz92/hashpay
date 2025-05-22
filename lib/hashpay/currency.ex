@@ -158,4 +158,9 @@ defmodule Hashpay.Currency do
   def total(tr) do
     ThunderRAM.total(tr, @trdb)
   end
+
+  def tab2list(%ThunderRAM{tables: tables}) do
+    %{ets: ets} = Map.get(tables, @trdb)
+    :ets.tab2list(ets)
+  end
 end

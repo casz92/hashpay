@@ -49,6 +49,20 @@ defmodule Hashpay.Variable do
     :persistent_term.get({:var, "validator_withdrawal_fee"}, 0.01)
   end
 
+  def show_all do
+    %{
+      factor_a: get_factor_a(),
+      factor_b: get_factor_b(),
+      round_rewarded_base: get_round_rewarded_base(),
+      round_rewarded_transactions: get_round_rewarded_transactions(),
+      round_size_target: get_round_size_target(),
+      currency_creation_cost: get_currency_creation_cost(),
+      validator_creation_cost: get_validator_creation_cost(),
+      merchant_creation_cost: get_merchant_creation_cost(),
+      validator_withdrawal_fee: get_validator_withdrawal_fee()
+    }
+  end
+
   def init(tr) do
     case get("factor_a") do
       nil ->

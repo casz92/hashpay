@@ -7,7 +7,7 @@ defmodule Hashpay.WebSocketClient do
   Implementado usando la librería websocket_client.
   """
   require Logger
-
+  alias Hashpay.SystemInfo
   @behaviour :websocket_client
 
   # 30 segundos
@@ -290,6 +290,18 @@ defmodule Hashpay.WebSocketClient do
       %{"id" => id, "method" => "heartbeat"} ->
         # Responder al heartbeat del servidor
         response = %{id: id, state: "ok"}
+        {:reply, {:text, encoder.(response)}, state}
+
+      %{"id" => id, "method" => "getInfo"} ->
+        response = SystemInfo.get_info() |> Map.put(:id, id)
+        {:reply, {:text, encoder.(response)}, state}
+
+      %{"id" => id, "method" => "getInfoSystem"} ->
+        response = SystemInfo.info_callback() |> Map.put(:id, id)
+        {:reply, {:text, encoder.(response)}, state}
+
+      %{"id" => id, "method" => "getInfoRoundchain"} ->
+        response = SystemInfo.roundchain_callback() |> Map.put(:id, id)
         {:reply, {:text, encoder.(response)}, state}
 
       %{"id" => id, "method" => _method} ->
