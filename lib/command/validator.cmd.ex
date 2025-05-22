@@ -1,16 +1,37 @@
 defmodule Hashpay.Validator.Command do
   alias Hashpay.Variable
   alias Hashpay.Validator
+  alias Hashpay.ValidatorName
   alias Hashpay.Balance
+
+  import Verify
 
   @default_currency Application.compile_env(:hashpay, :default_currency)
 
-  def create(_ctx = %{db: db, sender: %{id: sender_id}}, attrs) do
-    case Validator.get(db, sender_id) do
-      {:ok, _validator} ->
+  def create(
+        _ctx = %{db: db, sender: %{id: sender_id}},
+        attrs = %{
+          "name" => name,
+          "pubkey" => pubkey,
+          "hostname" => hostname,
+          "port" => port,
+          "channel" => channel
+        }
+      )
+      when is_binary(name) and is_binary(hostname) and
+             pubkey64?(pubkey) and
+             valid_port?(port) and is_binary(channel) do
+    cond do
+      not host?(hostname) ->
+        {:error, "Invalid hostname"}
+
+      Validator.exists?(db, sender_id) ->
         {:error, "Validator already exists"}
 
-      {:error, :not_found} ->
+      ValidatorName.exists?(db, name) ->
+        {:error, "Validator name already exists"}
+
+      true ->
         cost = Variable.get_validator_creation_cost() * (Validator.total(db) + 1)
 
         case Balance.incr_non_zero(db, sender_id, @default_currency, -cost) do
@@ -24,17 +45,27 @@ defmodule Hashpay.Validator.Command do
     end
   end
 
-  def change_name(ctx = %{db: db}, name) do
+  def create(_ctx, _attrs), do: {:error, "Invalid arguments"}
+
+  def change_name(ctx = %{db: db}, name) when is_binary(name) do
     Validator.merge(db, ctx.sender.id, %{name: name})
+
+    :math.pow(2, 10)
   end
 
-  def change_pubkey(ctx = %{db: db}, pubkey) do
+  def change_name(_ctx, _name), do: {:error, "Invalid arguments"}
+
+  def change_pubkey(ctx = %{db: db}, pubkey) when pubkey64?(pubkey) do
     Validator.merge(db, ctx.sender.id, %{pubkey: pubkey})
   end
 
-  def change_channel(ctx = %{db: db}, channel) do
+  def change_pubkey(_ctx, _pubkey), do: {:error, "Invalid arguments"}
+
+  def change_channel(ctx = %{db: db}, channel) when is_binary(channel) do
     Validator.merge(db, ctx.sender.id, %{channel: channel})
   end
+
+  def change_channel(_ctx, _channel), do: {:error, "Invalid arguments"}
 
   def update(_ctx = %{db: db, sender: %{id: sender_id}}, attrs) do
     attrs =
@@ -48,7 +79,8 @@ defmodule Hashpay.Validator.Command do
         "amount" => amount,
         "currency" => currency,
         "to" => to
-      }) do
+      })
+      when is_money_positive(amount) and is_binary(currency) and is_binary(to) do
     cost = compute_withdrawal_fee(amount)
 
     case Balance.incr_non_zero(db, validator_id, @default_currency, -cost) do
@@ -67,6 +99,8 @@ defmodule Hashpay.Validator.Command do
         error
     end
   end
+
+  def withdraw(_ctx, _attrs), do: {:error, "Invalid arguments"}
 
   def delete(ctx = %{db: db}) do
     case Validator.get(db, ctx.sender.id) do

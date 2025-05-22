@@ -1,4 +1,4 @@
-defmodule Hashpay.Balance.Command do
+defmodule Hashpay.Coin.Command do
   alias Hashpay.{Account, Balance, Currency, Property}
 
   @supply "@supply"

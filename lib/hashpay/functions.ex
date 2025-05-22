@@ -92,7 +92,7 @@ defmodule Hashpay.Functions do
     %Function{
       id: 200,
       name: "mintCoins",
-      mod: Hashpay.Balance.Commands,
+      mod: Hashpay.Coin.Commands,
       fun: :mint,
       auth_type: 1,
       thread: :type
@@ -100,14 +100,14 @@ defmodule Hashpay.Functions do
     %Function{
       id: 201,
       name: "transferCoins",
-      mod: Hashpay.Balance.Commands,
+      mod: Hashpay.Coin.Commands,
       fun: :transfer,
       auth_type: 1
     },
     %Function{
       id: 202,
       name: "frozenCoins",
-      mod: Hashpay.Balance.Commands,
+      mod: Hashpay.Coin.Commands,
       fun: :frozen,
       auth_type: 1,
       thread: :type
@@ -115,7 +115,7 @@ defmodule Hashpay.Functions do
     %Function{
       id: 203,
       name: "unfrozenCoins",
-      mod: Hashpay.Balance.Commands,
+      mod: Hashpay.Coin.Commands,
       fun: :unfrozen,
       auth_type: 1,
       thread: :type
@@ -123,7 +123,7 @@ defmodule Hashpay.Functions do
     %Function{
       id: 204,
       name: "burnCoins",
-      mod: Hashpay.Balance.Commands,
+      mod: Hashpay.Coin.Commands,
       fun: :burn,
       auth_type: 1
     },
