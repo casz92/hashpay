@@ -274,7 +274,7 @@ defmodule Hashpay.Round do
   end
 
   def get(tr, id) do
-    ThunderRAM.get_from_db(tr, @trdb, id)
+    ThunderRAM.fetch_from_db(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = round) do

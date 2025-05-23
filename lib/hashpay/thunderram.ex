@@ -28,6 +28,7 @@ defmodule ThunderRAM do
             [
               exists?: 3,
               get: 3,
+              fetch: 3,
               put: 4,
               incr: 4,
               delete: 3,
@@ -283,7 +284,7 @@ defmodule ThunderRAM do
 
     case :ets.lookup(ets, key) do
       [{^key, value}] -> {:ok, value}
-      [] -> get_from_db(tr, name, key)
+      [] -> fetch_from_db(tr, name, key)
     end
   end
 
@@ -294,7 +295,7 @@ defmodule ThunderRAM do
 
   defp incr_from_db(tr, ets, name, key) do
     if not :ets.member(ets, key) do
-      case get_from_db(tr, name, key) do
+      case fetch_from_db(tr, name, key) do
         {:ok, value} -> :ets.insert(ets, {key, value})
         _ -> false
       end
@@ -348,7 +349,7 @@ defmodule ThunderRAM do
   end
 
   def total(tr, name) do
-    case get(tr, name, @stat_count) do
+    case fetch(tr, name, @stat_count) do
       {:ok, count} -> count
       _ -> 0
     end
@@ -387,10 +388,22 @@ defmodule ThunderRAM do
         result = binary_to_term(value)
         if exp, do: Cache.put(name, key)
         :ets.insert(ets, {key, result})
-        {:ok, result}
+        result
 
-      :not_found ->
-        {:error, :not_found}
+      _err ->
+        nil
+    end
+  end
+
+  def fetch_from_db(%ThunderRAM{db: db, tables: tables}, name, key) do
+    %{handle: handle, ets: ets, exp: exp} = Map.get(tables, name)
+
+    case :rocksdb.get(db, handle, key, []) do
+      {:ok, value} ->
+        result = binary_to_term(value)
+        if exp, do: Cache.put(name, key)
+        :ets.insert(ets, {key, result})
+        {:ok, result}
 
       err ->
         err
