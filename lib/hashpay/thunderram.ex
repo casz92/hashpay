@@ -273,6 +273,15 @@ defmodule ThunderRAM do
     %{ets: ets} = Map.get(tables, name)
 
     case :ets.lookup(ets, key) do
+      [{^key, value}] -> value
+      [] -> get_from_db(tr, name, key)
+    end
+  end
+
+  def fetch(tr = %ThunderRAM{tables: tables}, name, key) do
+    %{ets: ets} = Map.get(tables, name)
+
+    case :ets.lookup(ets, key) do
       [{^key, value}] -> {:ok, value}
       [] -> get_from_db(tr, name, key)
     end
@@ -374,14 +383,14 @@ defmodule ThunderRAM do
     %{handle: handle, ets: ets, exp: exp} = Map.get(tables, name)
 
     case :rocksdb.get(db, handle, key, []) do
-      :not_found ->
-        {:error, :not_found}
-
       {:ok, value} ->
         result = binary_to_term(value)
         if exp, do: Cache.put(name, key)
         :ets.insert(ets, {key, result})
         {:ok, result}
+
+      :not_found ->
+        {:error, :not_found}
 
       err ->
         err

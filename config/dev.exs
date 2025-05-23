@@ -4,8 +4,8 @@ import Config
 
 # Configuración para el servidor HTTP/HTTPS
 config :hashpay,
-  http_port: 4000,
-  https_port: 4001
+  http_port: 8080,
+  https_port: 8443
 
 # Configuración para ScyllaDB/Cassandra usando Xandra
 config :hashpay, :scylla,
@@ -36,8 +36,10 @@ config :hashpay, :postgres,
 
 # Configuración para el logger en desarrollo
 config :logger, :console,
-  format: "[$level] $message\n",
-  level: :debug
+  format: "$message\n",
+  level: :debug,
+  colors: [debug: :light_black, info: :white, warn: :yellow, error: :red]
+
 
 # Configuración para Broadway
 config :hashpay, :broadway,

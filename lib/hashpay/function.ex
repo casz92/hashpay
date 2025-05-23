@@ -38,6 +38,8 @@ defmodule Hashpay.Function do
 end
 
 defmodule Hashpay.Function.Context do
+  @compile {:inline, [new: 5]}
+
   alias Hashpay.Merchant
   alias Hashpay.{Command, Account, Block, Round}
   alias Hashpay.Function.Context
@@ -46,6 +48,7 @@ defmodule Hashpay.Function.Context do
     :cmd,
     :fun,
     :sender,
+    :sender_type,
     :db,
     :batch,
     :block,
@@ -56,21 +59,19 @@ defmodule Hashpay.Function.Context do
           cmd: Command.t(),
           fun: Hashpay.Function.t(),
           sender: Account.t() | Merchant.t() | nil,
+          sender_type: Hashpay.object_type(),
           db: ThunderRAM.t(),
           # batch: Xandra.Batch.t(),
           block: Block.t() | nil,
           round: Round.t() | nil
         }
 
-  def new(cmd, fun, sender) do
-    new(ThunderRAM.get_tr(:blockchain), cmd, fun, sender)
-  end
-
-  def new(tr = %ThunderRAM{}, cmd, fun, sender) do
+  def new(tr = %ThunderRAM{}, cmd, fun, sender, sender_type) do
     %Context{
       cmd: cmd,
       fun: fun,
       sender: sender,
+      sender_type: sender_type,
       db: tr
     }
   end

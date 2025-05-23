@@ -30,11 +30,16 @@ defmodule Hashpay.Command do
     :timestamp
   ]
 
+  @threads Application.compile_env(:hashpay, :threads)
+  @channel Application.compile_env(:hashpay, :channel)
+  @default_channel Application.compile_env(:hashpay, :default_channel)
+
   alias Hashpay.Validator
   alias Hashpay.Merchant
   alias Hashpay.Account
   alias Hashpay.Function.Context
   alias Hashpay.Functions
+  alias Hashpay.TxIndex
   import Hashpay, only: [hash: 1]
 
   def new(attrs, size) do
@@ -74,31 +79,27 @@ defmodule Hashpay.Command do
   end
 
   @spec fetch_sender(ThunderRAM.t(), String.t()) ::
-          {:ok, Account.t() | Merchant.t()} | {:error, :not_found} | {:error, String.t()}
+          {:ok, Hashpay.object_type(), term()} | {:error, :not_found} | {:error, String.t()}
   def fetch_sender(tr, id) do
     <<prefix::binary-3, _rest::binary>> = id
 
     case prefix do
       "ac_" ->
-        Account.get(tr, id)
+        {Account.get(tr, id), :account}
 
       "mc_" ->
-        Merchant.get(tr, id)
+        {Merchant.get(tr, id), :merchant}
 
       "cu_" ->
-        Merchant.get(tr, id)
+        {Merchant.get(tr, id), :currency}
 
       <<"v_", _::binary>> ->
-        Validator.get(tr, id)
+        {Validator.get(tr, id), :validator}
 
       _ ->
         {:error, "Invalid sender"}
     end
   end
-
-  @threads Application.compile_env(:hashpay, :threads)
-  @channel Application.compile_env(:hashpay, :channel)
-  @default_channel Application.compile_env(:hashpay, :default_channel)
 
   @spec thread(Hashpay.Function.t(), t()) :: non_neg_integer()
   def thread(%{thread: :roundrobin}, _cmd) do
@@ -144,7 +145,7 @@ defmodule Hashpay.Command do
         tr = ThunderRAM.get_tr(:blockchain)
 
         case fetch_sender(tr, command.from) do
-          {:ok, sender} ->
+          {:ok, sender, sender_type} ->
             cond do
               sender.channel != @channel && sender.channel != @default_channel ->
                 {:error, "Invalid channel"}
@@ -152,8 +153,12 @@ defmodule Hashpay.Command do
               function.auth_type == 1 && !verify_signature(command, sender.public_key) ->
                 {:error, "Invalid signature"}
 
+              TxIndex.valid?(tr, sender.id, command.hash) ->
+                {:error, "Transaction already executed"}
+
               true ->
-                context = Context.new(command, function, sender)
+                TxIndex.put(tr, sender.id, command.hash)
+                context = Context.new(tr, command, function, sender, sender_type)
                 thread = thread(function, command)
                 SpawnPool.cast(:worker_pool, thread, context)
             end

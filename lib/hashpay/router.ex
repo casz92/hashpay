@@ -106,6 +106,18 @@ defmodule Hashpay.Router do
     end
   end
 
+  get "/v1/admin/ws" do
+    conn = fetch_query_params(conn)
+
+    conn
+    |> WebSockAdapter.upgrade(
+      Hashpay.Admin.Handler,
+      [params: conn.params],
+      timeout: 150_000
+    )
+    |> halt()
+  end
+
   if Application.compile_env(:hashpay, :enable_cluster, true) do
     get "/v1/cluster/ws" do
       conn = fetch_query_params(conn)

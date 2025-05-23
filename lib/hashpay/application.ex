@@ -14,18 +14,18 @@ defmodule Hashpay.Application do
     http_port = get_env(:http_port, 4000)
     https_port = get_env(:https_port, 4001)
     threads = get_env(:threads, 2)
-    # db_opts = get_env(:postgres, nil)
+    # db_opts = get_env(:postgres)
 
     # Inicializar estado
     init_state()
 
     # Asegurar que el directorio para la base de datos SQLite exista
-    File.mkdir_p!(Path.dirname(Application.get_env(:hashpay, Hashpay.Repo)[:database]))
+    File.mkdir_p!(Path.dirname(get_env(Hashpay.Repo)[:database]))
 
     # Configuración para HTTP
     children = [
       {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
-      :poolboy.child_spec(:event_consumer_pool, get_env(:event_consumer_pool, nil)),
+      :poolboy.child_spec(:event_consumer_pool, get_env(:event_consumer_pool)),
       Hashpay.Cache,
       {Hashpay.Roundchain, []},
       # PubSub para comunicación entre procesos
