@@ -40,7 +40,7 @@ defmodule Hashpay.Currency.Command do
         {:error, "Invalid name"}
 
       true ->
-        case Currency.get(ctx.db, id) do
+        case Currency.fetch(ctx.db, id) do
           {:ok, currency} ->
             Currency.put(ctx.db, Map.put(currency, :name, name))
 
@@ -53,7 +53,7 @@ defmodule Hashpay.Currency.Command do
   def change_pubkey(ctx, id, pubkey) do
     pubkey = Base.decode64!(pubkey)
 
-    case Currency.get(ctx.db, id) do
+    case Currency.fetch(ctx.db, id) do
       {:ok, currency} ->
         Currency.put(ctx.db, Map.put(currency, :pubkey, pubkey))
 
@@ -63,7 +63,7 @@ defmodule Hashpay.Currency.Command do
   end
 
   def change_channel(ctx, id, channel) do
-    case Currency.get(ctx.db, id) do
+    case Currency.fetch(ctx.db, id) do
       {:ok, currency} ->
         Currency.put(ctx.db, Map.put(currency, :channel, channel))
 

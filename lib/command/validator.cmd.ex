@@ -103,7 +103,7 @@ defmodule Hashpay.Validator.Command do
   def withdraw(_ctx, _attrs), do: {:error, "Invalid arguments"}
 
   def delete(ctx = %{db: db}) do
-    case Validator.get(db, ctx.sender.id) do
+    case Validator.fetch(db, ctx.sender.id) do
       {:ok, validator} ->
         Validator.delete(db, validator)
 

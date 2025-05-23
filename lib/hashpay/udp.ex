@@ -323,7 +323,7 @@ defmodule Udp do
     case :gen_udp.open(port, udp_options) do
       {:ok, socket} ->
         {:ok, {local_ip, local_port}} = :inet.sockname(socket)
-        Logger.info("UDP server started on #{format_ip(local_ip)}:#{local_port}")
+        Logger.debug("UDP server started on #{format_ip(local_ip)}:#{local_port}")
 
         state = %{
           socket: socket,

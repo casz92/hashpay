@@ -392,8 +392,8 @@ defmodule Hashpay.Functions do
   @funcs_by_id @functions |> Enum.map(fn func -> {func.id, func} end) |> Enum.into(%{})
   @funcs_by_name @functions |> Enum.map(fn func -> {func.name, func} end) |> Enum.into(%{})
 
-  @spec get(pos_integer()) :: {:ok, Function.t()} | :error
-  def get(id) do
+  @spec fetch(pos_integer()) :: {:ok, Function.t()} | :error
+  def fetch(id) do
     Map.fetch(@funcs_by_id, id)
   end
 

@@ -85,16 +85,16 @@ defmodule Hashpay.Command do
 
     case prefix do
       "ac_" ->
-        {Account.get(tr, id), :account}
+        {Account.fetch(tr, id), :account}
 
       "mc_" ->
-        {Merchant.get(tr, id), :merchant}
+        {Merchant.fetch(tr, id), :merchant}
 
       "cu_" ->
-        {Merchant.get(tr, id), :currency}
+        {Merchant.fetch(tr, id), :currency}
 
       <<"v_", _::binary>> ->
-        {Validator.get(tr, id), :validator}
+        {Validator.fetch(tr, id), :validator}
 
       _ ->
         {:error, "Invalid sender"}
@@ -140,7 +140,7 @@ defmodule Hashpay.Command do
 
   @spec handle(t()) :: {:ok, any()} | {:error, String.t()}
   def handle(command) do
-    case Functions.get(command.fun) do
+    case Functions.fetch(command.fun) do
       {:ok, function} ->
         tr = ThunderRAM.get_tr(:blockchain)
 

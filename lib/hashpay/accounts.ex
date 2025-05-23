@@ -53,8 +53,8 @@ defmodule Hashpay.Account do
     }
   end
 
-  def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+  def fetch(tr, id) do
+    ThunderRAM.fetch(tr, @trdb, id)
   end
 
   def verified?(%Account{verified: verified}), do: verified > 0
@@ -78,7 +78,7 @@ defmodule Hashpay.Account do
   end
 
   def delete(tr, id) do
-    account = get(tr, id)
+    account = fetch(tr, id)
     ThunderRAM.delete(tr, @trdb, id)
     AccountName.delete(tr, account.name)
   end

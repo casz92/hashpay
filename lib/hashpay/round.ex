@@ -273,7 +273,7 @@ defmodule Hashpay.Round do
     ]
   end
 
-  def get(tr, id) do
+  def fetch(tr, id) do
     ThunderRAM.fetch_from_db(tr, @trdb, id)
   end
 
@@ -293,14 +293,14 @@ defmodule Hashpay.Round do
   end
 
   def last(tr) do
-    case get(tr, "$last") do
+    case fetch(tr, "$last") do
       {:ok, round} -> round
       _ -> nil
     end
   end
 
   def total(tr) do
-    case ThunderRAM.get(tr, @trdb, "$count") do
+    case ThunderRAM.fetch(tr, @trdb, "$count") do
       {:ok, count} -> count
       _ -> 0
     end

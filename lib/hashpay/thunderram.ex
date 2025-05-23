@@ -44,14 +44,32 @@ defmodule ThunderRAM do
 
     {db, cfs} =
       if File.exists?(filename) do
+        # check column families
+        {:ok, column_families} = :rocksdb.list_column_families(filename, [])
+
+        column_families_mod = Enum.map(modules, & &1.dbopts()[:handle])
+
+        columns_to_create =
+          column_families_mod -- column_families
+
+        column_families_to_load = column_families_mod -- columns_to_create
+
         cfs_opts = [
-          {~c"default", []} | Enum.map(modules, &{&1.dbopts()[:handle], []})
+          {~c"default", []} | Enum.map(column_families_to_load, &{&1, []})
         ]
 
+        # open database with column families
         {:ok, db, [_default_cf | cfs]} =
           :rocksdb.open(filename, @open_options, cfs_opts)
 
-        {db, cfs}
+        # create column families
+        cfsh =
+          for name <- columns_to_create do
+            {:ok, handle} = :rocksdb.create_column_family(db, name, [])
+            handle
+          end
+
+        {db, cfs ++ cfsh}
       else
         try do
           {:ok, db, _default_cf} =

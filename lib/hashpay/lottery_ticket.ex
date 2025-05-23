@@ -69,7 +69,7 @@ defmodule Hashpay.LotteryTicket do
   end
 
   def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+    ThunderRAM.fetch(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = ticket) do

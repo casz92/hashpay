@@ -4,7 +4,7 @@ defmodule Hashpay.TxIndex do
   def dbopts do
     [
       name: :tx_index,
-      handle: ~c"tx_index",
+      handle: ~c"tx_idx",
       exp: true
     ]
   end
@@ -14,7 +14,7 @@ defmodule Hashpay.TxIndex do
   end
 
   def valid?(tr, sender_id, tx_hash) do
-    case ThunderRAM.get(tr, :tx_index, sender_id) do
+    case ThunderRAM.fetch(tr, :tx_index, sender_id) do
       {:ok, hash} -> tx_hash > hash
       _ -> false
     end

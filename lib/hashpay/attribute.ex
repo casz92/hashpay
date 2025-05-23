@@ -1,14 +1,14 @@
-defmodule Hashpay.Property do
+defmodule Hashpay.Attribute do
   @moduledoc """
-  Estructura y funciones para las propiedades de las entidades de la blockchain de Hashpay.
+  Estructura y funciones para los atributos de las entidades de la blockchain de Hashpay.
   """
 
-  @trdb :properties
+  @trdb :attributes
 
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"properties",
+      handle: ~c"attributes",
       exp: true
     ]
   end
@@ -16,7 +16,7 @@ defmodule Hashpay.Property do
   def get(tr, key) do
     case ThunderRAM.get(tr, @trdb, key) do
       nil -> nil
-      props -> props
+      attrs -> attrs
     end
   end
 
@@ -25,8 +25,8 @@ defmodule Hashpay.Property do
       nil ->
         default
 
-      props ->
-        Map.get(props, name, nil)
+      attrs ->
+        Map.get(attrs, name, nil)
     end
   end
 
@@ -39,9 +39,9 @@ defmodule Hashpay.Property do
       nil ->
         ThunderRAM.put(tr, @trdb, key, %{name => value})
 
-      props ->
-        props = Map.put(props, name, value)
-        ThunderRAM.put(tr, @trdb, key, props)
+      attrs ->
+        attrs = Map.put(attrs, name, value)
+        ThunderRAM.put(tr, @trdb, key, attrs)
     end
   end
 
@@ -54,8 +54,8 @@ defmodule Hashpay.Property do
       nil ->
         false
 
-      props ->
-        Map.has_key?(props, name)
+      attrs ->
+        Map.has_key?(attrs, name)
     end
   end
 
@@ -68,13 +68,13 @@ defmodule Hashpay.Property do
       nil ->
         nil
 
-      props ->
-        props = Map.delete(props, name)
+      attrs ->
+        attrs = Map.delete(attrs, name)
 
-        if map_size(props) == 0 do
+        if map_size(attrs) == 0 do
           ThunderRAM.delete(tr, @trdb, id)
         else
-          ThunderRAM.put(tr, @trdb, id, props)
+          ThunderRAM.put(tr, @trdb, id, attrs)
         end
     end
   end

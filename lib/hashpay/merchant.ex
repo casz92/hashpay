@@ -74,8 +74,8 @@ defmodule Hashpay.Merchant do
     ]
   end
 
-  def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+  def fetch(tr, id) do
+    ThunderRAM.fetch(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = merchant) do
@@ -97,7 +97,7 @@ defmodule Hashpay.Merchant do
   end
 
   def delete(tr, id) do
-    merchant = get(tr, id)
+    merchant = fetch(tr, id)
     ThunderRAM.delete(tr, @trdb, id)
     MerchantName.delete(tr, merchant.name)
   end

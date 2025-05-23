@@ -2,7 +2,6 @@ defmodule Hashpay.SystemInfo do
   alias Hashpay.Roundchain
   alias Hashpay.Variable
   alias Hashpay.Round
-  alias Hashpay.Block
   alias Hashpay.Currency
   alias Hashpay.Validator
 
@@ -45,21 +44,10 @@ defmodule Hashpay.SystemInfo do
 
     total_currencies = length(currencies)
 
-    blocks =
-      last_round.blocks
-      |> Enum.map(fn block_hash ->
-        Block.get(tr, block_hash)
-      end)
-      |> Enum.filter(fn
-        {:ok, _block} -> true
-        _error -> false
-      end)
-      |> Enum.map(fn {_ok, block} -> block end)
-
     %{
       active: status,
       round: last_round,
-      blocks: blocks,
+      blocks: last_round.blocks,
       validators: validators,
       total_validators: total_validators,
       currencies: currencies,

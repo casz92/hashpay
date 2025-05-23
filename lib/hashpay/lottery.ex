@@ -106,7 +106,7 @@ defmodule Hashpay.Lottery do
   end
 
   def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+    ThunderRAM.fetch(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = lottery) do
@@ -122,7 +122,7 @@ defmodule Hashpay.Lottery do
   end
 
   def change_status(tr, id, status) do
-    case ThunderRAM.get(tr, @trdb, id) do
+    case ThunderRAM.fetch(tr, @trdb, id) do
       {:ok, lottery} ->
         ThunderRAM.put(tr, @trdb, lottery.id, %{lottery | status: status})
 

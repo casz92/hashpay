@@ -89,8 +89,8 @@ defmodule Hashpay.Payday do
     ]
   end
 
-  def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+  def fetch(tr, id) do
+    ThunderRAM.fetch(tr, @trdb, id)
   end
 
   def put(tr, %__MODULE__{} = payday) do

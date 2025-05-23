@@ -19,7 +19,7 @@ defmodule Hashpay.Merchant.Command do
   def change_pubkey(ctx = %{db: db}, %{"pubkey" => pubkey}) do
     pubkey = Base.decode64!(pubkey)
 
-    case Merchant.get(db, ctx.sender.id) do
+    case Merchant.fetch(db, ctx.sender.id) do
       {:ok, merchant} ->
         Merchant.put(db, Map.put(merchant, :pubkey, pubkey))
 
@@ -34,7 +34,7 @@ defmodule Hashpay.Merchant.Command do
         {:error, "The name: #{name} is already taken"}
 
       true ->
-        case Merchant.get(db, ctx.sender.id) do
+        case Merchant.fetch(db, ctx.sender.id) do
           {:ok, merchant} ->
             Merchant.put(db, Map.put(merchant, :name, name))
 
@@ -45,7 +45,7 @@ defmodule Hashpay.Merchant.Command do
   end
 
   def change_channel(ctx = %{db: db}, %{"channel" => channel}) do
-    case Merchant.get(db, ctx.sender.id) do
+    case Merchant.fetch(db, ctx.sender.id) do
       {:ok, merchant} ->
         Merchant.put(db, Map.put(merchant, :channel, channel))
 
@@ -55,7 +55,7 @@ defmodule Hashpay.Merchant.Command do
   end
 
   def delete(ctx = %{db: db}) do
-    case Merchant.get(db, ctx.sender.id) do
+    case Merchant.fetch(db, ctx.sender.id) do
       {:ok, %{id: account_id}} ->
         Merchant.delete(db, account_id)
 

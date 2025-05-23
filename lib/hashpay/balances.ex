@@ -64,8 +64,8 @@ defmodule Hashpay.Balance do
     key = key_merge(id, token)
 
     case ThunderRAM.get(tr, @trdb, key) do
-      {:ok, amount} -> amount
-      _ -> 0
+      nil -> 0
+      amount -> amount
     end
   end
 

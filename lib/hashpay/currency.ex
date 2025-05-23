@@ -126,6 +126,10 @@ defmodule Hashpay.Currency do
     ThunderRAM.get(tr, @trdb, id)
   end
 
+  def fetch(tr, id) do
+    ThunderRAM.fetch(tr, @trdb, id)
+  end
+
   def put(tr, %__MODULE__{} = currency) do
     ThunderRAM.put(tr, @trdb, currency.id, currency)
     ThunderRAM.count_one(tr, @trdb)
@@ -136,7 +140,7 @@ defmodule Hashpay.Currency do
   end
 
   def merge(tr, id, attrs) do
-    case get(tr, id) do
+    case fetch(tr, id) do
       {:ok, currency} ->
         currency = Map.merge(currency, attrs)
         ThunderRAM.put(tr, @trdb, currency.id, currency)

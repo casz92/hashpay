@@ -59,7 +59,7 @@ defmodule Hashpay.Member do
 
   def get(tr, group_id, member_id) do
     key = key_merge(group_id, member_id)
-    ThunderRAM.get(tr, @trdb, key)
+    ThunderRAM.fetch(tr, @trdb, key)
   end
 
   def exists?(tr, group_id, member_id) do

@@ -237,7 +237,7 @@ defmodule Hashpay.Block do
     ]
   end
 
-  def get(tr, id) do
+  def fetch(tr, id) do
     ThunderRAM.fetch_from_db(tr, @trdb, id)
   end
 
@@ -253,7 +253,7 @@ defmodule Hashpay.Block do
   end
 
   def last(tr, vid) do
-    case get(tr, key_merge("$last", vid)) do
+    case fetch(tr, key_merge("$last", vid)) do
       {:ok, block} -> block
       _ -> nil
     end

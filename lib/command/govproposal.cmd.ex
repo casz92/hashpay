@@ -79,7 +79,7 @@ defmodule Hashpay.GovProposal.Command do
         {:error, "Already voted"}
 
       true ->
-        case GovProposal.get(db, proposal_id) do
+        case GovProposal.fetch(db, proposal_id) do
           {:ok, %{status: status}} when status != 0 ->
             {:error, "GovProposal already closed"}
 
@@ -117,7 +117,7 @@ defmodule Hashpay.GovProposal.Command do
   def cancel(%{db: db, sender: %{id: sender_id}}, %{
         "proposal_id" => proposal_id
       }) do
-    case GovProposal.get(db, proposal_id) do
+    case GovProposal.fetch(db, proposal_id) do
       {:ok, govproposal} ->
         cond do
           govproposal.status != 0 ->

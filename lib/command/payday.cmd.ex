@@ -38,7 +38,7 @@ defmodule Hashpay.Payday.Command do
   def claim(%{db: db, sender: %{id: sender_id}}, %{"currency" => currency_id}) do
     payday_id = Payday.generate_id(sender_id, currency_id)
 
-    case Payday.get(db, payday_id) do
+    case Payday.fetch(db, payday_id) do
       {:ok, payday} ->
         last_round_id = Hashpay.get_last_round_id()
         currency = Currency.get(db, currency_id)
@@ -77,7 +77,7 @@ defmodule Hashpay.Payday.Command do
       }) do
     payday_id = Payday.generate_id(sender_id, currency_id)
 
-    case Payday.get(db, payday_id) do
+    case Payday.fetch(db, payday_id) do
       {:ok, payday} ->
         case Balance.incr_non_zero(db, payday_id, -amount) do
           {:ok, _result_amount} ->

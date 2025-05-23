@@ -26,7 +26,9 @@ defmodule Hashpay.Roundchain do
     Round,
     Block,
     Property,
-    GovProposal
+    GovProposal,
+    Attribute,
+    TxIndex
   }
 
   @round_time Application.compile_env(:hashpay, :round_time)
@@ -71,7 +73,7 @@ defmodule Hashpay.Roundchain do
 
     def new(db, vid, seed) do
       me =
-        case Validator.get(db, vid) do
+        case Validator.fetch(db, vid) do
           {:ok, validator} -> validator
           _not_found -> nil
         end
@@ -311,7 +313,7 @@ defmodule Hashpay.Roundchain do
       :ets.insert(:replicants, {hostname, %{}})
     end)
 
-    Logger.info("Replicants loaded: #{length(replicants)}")
+    Logger.debug("Replicants loaded: #{length(replicants)}")
   end
 
   @impl true
@@ -462,8 +464,8 @@ defmodule Hashpay.Roundchain do
 
     try do
       # me_round = creator_id == me.id
-      {:ok, creator} = Validator.get(db, creator_id)
-      {:ok, from} = Validator.get(db, from_id)
+      {:ok, creator} = Validator.fetch(db, creator_id)
+      {:ok, from} = Validator.fetch(db, from_id)
 
       # Verify from signature
       case Cafezinho.Impl.verify(from_signature, round.hash, from.pubkey) do
@@ -610,7 +612,7 @@ defmodule Hashpay.Roundchain do
   defp round_reward(db, round) do
     Logger.debug("Round reward: #{inspect(round.reward)}")
 
-    case Currency.get(db, @default_currency) do
+    case Currency.fetch(db, @default_currency) do
       {:ok, currency} ->
         max_supply = currency.max_supply
         amount = round.reward
@@ -654,7 +656,9 @@ defmodule Hashpay.Roundchain do
           Lottery,
           LotteryTicket,
           Property,
-          GovProposal
+          GovProposal,
+          Attribute,
+          TxIndex
         ]
       )
 

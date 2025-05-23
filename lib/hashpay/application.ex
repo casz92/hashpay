@@ -57,7 +57,7 @@ defmodule Hashpay.Application do
     ]
 
     # Mostrar información de inicio
-    Logger.debug("Starting Hashpay v#{version} ⌛")
+    Logger.info("Starting Hashpay v#{version} ⌛")
 
     # Ver https://hexdocs.pm/elixir/Supervisor.html
     # para otras estrategias y opciones

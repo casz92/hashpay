@@ -53,7 +53,7 @@ defmodule Hashpay.Admin.Handler do
         vid = Application.get_env(:hashpay, :id)
         db = ThunderRAM.get_tr(:blockchain)
 
-        case Validator.get(db, vid) do
+        case Validator.fetch(db, vid) do
           {:ok, validator} ->
             response = %{id: id, data: validator}
             {:push, {:text, encode(response)}, state}

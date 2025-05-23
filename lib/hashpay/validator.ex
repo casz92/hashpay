@@ -133,8 +133,8 @@ defmodule Hashpay.Validator do
     ThunderRAM.foreach(tr, @trdb, fun)
   end
 
-  def get(tr, id) do
-    ThunderRAM.get(tr, @trdb, id)
+  def fetch(tr, id) do
+    ThunderRAM.fetch(tr, @trdb, id)
   end
 
   def slot(tr, position) do
@@ -156,7 +156,7 @@ defmodule Hashpay.Validator do
   end
 
   def merge(tr, id, attrs) do
-    case get(tr, id) do
+    case fetch(tr, id) do
       {:ok, validator} ->
         validator = Map.merge(validator, attrs)
         ThunderRAM.put(tr, @trdb, validator.id, validator)
@@ -172,7 +172,7 @@ defmodule Hashpay.Validator do
   end
 
   def delete(tr, id) do
-    case get(tr, id) do
+    case fetch(tr, id) do
       {:ok, validator} ->
         ThunderRAM.delete(tr, @trdb, id)
         ValidatorName.delete(tr, validator.name)
