@@ -4,14 +4,17 @@ defmodule Hashpay.Account.Command do
   alias Hashpay.AccountName
 
   @spec create(Context.t(), map()) :: {:ok, Account.t()} | {:error, String.t()}
-  def create(_ctx = %{db: db}, attrs) do
+  def create(_ctx = %{cmd: _cmd, db: db}, attrs) do
     account = Account.new(attrs)
 
-    case Account.exists?(db, account.id) do
-      true ->
+    cond do
+      not AccountName.exists?(db, account.name) ->
+        {:error, "The name: #{account.name} is already taken"}
+
+      Account.exists?(db, account.id) ->
         {:error, "Account already exists"}
 
-      _false ->
+      true ->
         Account.put_new(db, account)
     end
   end

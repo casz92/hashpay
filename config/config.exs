@@ -13,9 +13,13 @@ config :blake3,
 import_config "genesis.exs"
 
 # Configuración del validador
-config :hashpay, :channel, "first"
 config :hashpay, :threads, System.schedulers_online()
 config :hashpay, :quorum, type: "1/3", limit: 10
+
+channel = "first"
+config :hashpay, :channel, channel
+{:ok, channel_regex} = Regex.compile("(^|-)#{channel}($|-)")
+config :hashpay, :channel_scan, channel_regex
 
 # ID del validador
 config :hashpay, :id, "v_1UmjkVzfksJHu4UqEohMFB"

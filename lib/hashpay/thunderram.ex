@@ -47,7 +47,7 @@ defmodule ThunderRAM do
         # check column families
         {:ok, column_families} = :rocksdb.list_column_families(filename, [])
 
-        column_families_mod = Enum.map(modules, & &1.dbopts()[:handle])
+        column_families_mod = Enum.map(modules, &Atom.to_charlist(&1.dbopts()[:name]))
 
         columns_to_create =
           column_families_mod -- column_families
@@ -77,7 +77,8 @@ defmodule ThunderRAM do
 
           cfs =
             Enum.map(modules, fn mod ->
-              {:ok, handle} = :rocksdb.create_column_family(db, mod.dbopts()[:handle], [])
+              name = mod.dbopts()[:name] |> Atom.to_charlist()
+              {:ok, handle} = :rocksdb.create_column_family(db, name, [])
               handle
             end)
 
@@ -428,6 +429,45 @@ defmodule ThunderRAM do
     end
   end
 
+  def batch_save(%ThunderRAM{batch: batch}, filename) do
+    binary = :rocksdb.batch_tolist(batch) |> term_to_binary()
+    File.write(filename, binary)
+  end
+
+  def batch_load(%ThunderRAM{tables: tables}, dbfile, filename) do
+    binary = File.read!(filename)
+    operations = binary_to_term(binary)
+
+    if byte_size(operations) == 0 do
+      {:ok, batch} = :rocksdb.batch()
+
+      {:ok, cfs} =
+        :rocksdb.list_column_families(dbfile, [])
+
+      cfs_indexed =
+        Enum.map(cfs, fn x ->
+          Map.get(tables, String.Chars.to_string(x) |> String.to_atom())[:handle]
+        end)
+        |> Enum.with_index(fn element, index -> {index, element} end)
+        |> Enum.into(%{})
+
+      Enum.each(operations, fn
+        {:put, cf, key, value} ->
+          :rocksdb.batch_put(batch, cfs_indexed[cf], key, value)
+
+        {:delete, cf, key} ->
+          :rocksdb.batch_delete(batch, cf, key)
+
+        _ ->
+          nil
+      end)
+
+      batch
+    else
+      nil
+    end
+  end
+
   def sync(tr = %ThunderRAM{batch: batch, db: db}) do
     if is_reference(batch) and :rocksdb.batch_count(batch) > 0 do
       :rocksdb.write_batch(db, batch, [])
@@ -538,6 +578,6 @@ defmodule ThunderRAM do
   end
 
   defp binary_to_term(binary) do
-    :erlang.binary_to_term(binary)
+    :erlang.binary_to_term(binary, [:safe])
   end
 end

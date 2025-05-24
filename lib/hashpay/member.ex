@@ -47,7 +47,6 @@ defmodule Hashpay.Member do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"members",
       exp: true
     ]
   end

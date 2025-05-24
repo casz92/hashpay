@@ -27,7 +27,7 @@ defmodule Hashpay.Application do
       {SpawnPool, name: :worker_pool, size: threads, worker: Hashpay.Worker},
       :poolboy.child_spec(:event_consumer_pool, get_env(:event_consumer_pool)),
       Hashpay.Cache,
-      {Hashpay.Roundchain, []},
+      {Hashpay.Roundchain, [active: true]},
       # PubSub para comunicación entre procesos
       Hashpay.PubSub,
       {Hashpay.Cluster, name: :cluster},

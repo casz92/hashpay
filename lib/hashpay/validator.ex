@@ -99,7 +99,6 @@ defmodule Hashpay.Validator do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"validators",
       exp: false,
       ets_type: :ordered_set
     ]
@@ -131,6 +130,10 @@ defmodule Hashpay.Validator do
 
   def foreach(tr, fun) do
     ThunderRAM.foreach(tr, @trdb, fun)
+  end
+
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
   def fetch(tr, id) do
@@ -199,7 +202,6 @@ defmodule Hashpay.ValidatorName do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"validator_names_idx",
       exp: false
     ]
   end

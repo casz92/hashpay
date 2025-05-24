@@ -31,7 +31,6 @@ defmodule Hashpay.Balance do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"balances",
       exp: true
     ]
   end

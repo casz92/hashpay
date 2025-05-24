@@ -89,7 +89,6 @@ defmodule Hashpay.GovProposal do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"gproposals",
       exp: true
     ]
   end

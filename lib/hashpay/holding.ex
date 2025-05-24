@@ -63,7 +63,6 @@ defmodule Hashpay.Holding do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"holdings",
       exp: true
     ]
   end

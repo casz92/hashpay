@@ -13,7 +13,7 @@ pubkey =
   <<227, 38, 15, 35, 73, 127, 51, 97, 125, 228, 215, 211, 56, 223, 83, 111, 112, 7, 128, 76, 54,
     76, 249, 124, 169, 100, 143, 196, 71, 6, 123, 83>>
 
-default_channel = "#origin"
+default_channel = "origin"
 
 config :hashpay, :hashnumber, hashnumber
 config :hashpay, :pubkey, pubkey

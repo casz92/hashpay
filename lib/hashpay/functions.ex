@@ -12,7 +12,7 @@ defmodule Hashpay.Functions do
       mod: Hashpay.Account.Commands,
       fun: :create,
       auth_type: 0,
-      thread: :type_and_args
+      thread: {:arg, :name}
     },
     %Function{
       id: 2,

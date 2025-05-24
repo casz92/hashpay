@@ -8,7 +8,6 @@ defmodule Hashpay.Attribute do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"attributes",
       exp: true
     ]
   end

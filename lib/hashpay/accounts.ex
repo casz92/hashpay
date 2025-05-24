@@ -30,7 +30,6 @@ defmodule Hashpay.Account do
   def dbopts do
     [
       name: :accounts,
-      handle: ~c"accounts",
       exp: true
     ]
   end
@@ -51,6 +50,10 @@ defmodule Hashpay.Account do
       channel: channel,
       type_alg: Map.get(attrs, "type_alg", 0)
     }
+  end
+
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
   def fetch(tr, id) do
@@ -91,7 +94,6 @@ defmodule Hashpay.AccountName do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"account_names_idx",
       exp: true
     ]
   end

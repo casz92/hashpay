@@ -67,7 +67,6 @@ defmodule Hashpay.Paystream do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"paystreams",
       exp: true
     ]
   end

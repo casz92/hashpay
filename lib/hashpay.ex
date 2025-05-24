@@ -19,6 +19,9 @@ defmodule Hashpay do
           | :lottery
           | :lottery_ticket
           | :paystream
+          | :govproposal
+          | :property
+          | :attribute
 
   @compile {:inline, [hash: 1]}
 

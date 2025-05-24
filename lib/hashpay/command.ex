@@ -7,8 +7,8 @@ defmodule Hashpay.Command do
   - fun: Nombre de la función a ejecutar
   - args: Argumentos de la función
   - from: Identificador del emisor del comando
-  - timestamp: Marca de tiempo de creación del comando
-  - signature: Firma digital del emisor
+  - time: Marca de tiempo de creación del comando
+  - sign: Firma digital del emisor
   """
   @type t :: %__MODULE__{
           hash: binary() | nil,
@@ -16,8 +16,8 @@ defmodule Hashpay.Command do
           args: list() | nil,
           from: String.t() | nil,
           size: non_neg_integer(),
-          signature: binary() | nil,
-          timestamp: non_neg_integer()
+          sign: binary() | nil,
+          time: non_neg_integer()
         }
 
   defstruct [
@@ -26,8 +26,8 @@ defmodule Hashpay.Command do
     :args,
     :from,
     :size,
-    :signature,
-    :timestamp
+    :sign,
+    :time
   ]
 
   @threads Application.compile_env(:hashpay, :threads)
@@ -42,16 +42,28 @@ defmodule Hashpay.Command do
   alias Hashpay.TxIndex
   import Hashpay, only: [hash: 1]
 
-  def new(attrs, size) do
+  def new(attrs, size, :text) do
     %__MODULE__{
       fun: attrs["fun"],
       args: attrs["args"],
       from: attrs["from"],
       size: size,
-      signature: attrs["signature"],
-      timestamp: attrs["timestamp"]
+      sign: Base.decode64!(attrs["sign"]),
+      time: attrs["time"]
     }
-    |> put_hash()
+    |> compute_hash()
+  end
+
+  def new(attrs, size, :binary) do
+    %__MODULE__{
+      fun: attrs["fun"],
+      args: attrs["args"],
+      from: attrs["from"],
+      size: size,
+      sign: attrs["sign"],
+      time: attrs["time"]
+    }
+    |> compute_hash()
   end
 
   @spec encode(t()) :: String.t()
@@ -62,39 +74,93 @@ defmodule Hashpay.Command do
   @spec decode(String.t()) :: t()
   def decode(json) do
     Jason.decode!(json)
-    |> new(byte_size(json))
   end
 
-  defp put_hash(command) do
-    %{command | hash: hash(command)}
+  defmodule Encoder do
+    @join ""
+
+    def to_binary(value) when is_map(value) do
+      value
+      |> Enum.map(fn {k, v} -> IO.iodata_to_binary([k, ":", to_binary(v)]) end)
+      |> Enum.join(@join)
+    end
+
+    def to_binary(value) when is_list(value) do
+      value
+      |> Enum.map(&to_binary/1)
+      |> Enum.join(@join)
+    end
+
+    def to_binary(value), do: to_string(value)
+  end
+
+  defp compute_hash(command = %{time: time, fun: fun, args: args, from: from, sign: signature}) do
+    targs = Encoder.to_binary(args)
+
+    iodata =
+      [
+        fun,
+        targs,
+        from,
+        time
+      ]
+      |> Enum.join("|")
+
+    <<fhash::binary-24, _rest::binary>> = hash(iodata)
+    hash = [<<time::64>>, fhash] |> IO.iodata_to_binary()
+    %{command | hash: hash, size: byte_size(iodata) + byte_size(signature)}
   end
 
   def sign(command, private_key) do
     {:ok, signature} = Cafezinho.Impl.sign(hash(command), private_key)
-    %{command | signature: signature}
+    %{command | sign: signature}
   end
 
   def verify_signature(command, public_key) do
-    Cafezinho.Impl.verify(command.signature, command.hash, public_key)
+    Cafezinho.Impl.verify(command.sign, command.hash, public_key)
   end
 
-  @spec fetch_sender(ThunderRAM.t(), String.t()) ::
-          {:ok, Hashpay.object_type(), term()} | {:error, :not_found} | {:error, String.t()}
-  def fetch_sender(tr, id) do
+  # @spec fetch_sender(ThunderRAM.t(), String.t()) ::
+  #         {:ok, Hashpay.object_type(), term()} | {:error, :not_found} | {:error, String.t()}
+  def fetch_sender(_tr, id, 0) do
     <<prefix::binary-3, _rest::binary>> = id
 
     case prefix do
       "ac_" ->
-        {Account.fetch(tr, id), :account}
+        {:ok, :account}
 
       "mc_" ->
-        {Merchant.fetch(tr, id), :merchant}
+        {:ok, :merchant}
 
       "cu_" ->
-        {Merchant.fetch(tr, id), :currency}
+        {:ok, :currency}
 
       <<"v_", _::binary>> ->
-        {Validator.fetch(tr, id), :validator}
+        {:ok, :validator}
+
+      _ ->
+        {:error, "Invalid sender"}
+    end
+  end
+
+  def fetch_sender(tr, id, 1) do
+    <<prefix::binary-3, _rest::binary>> = id
+
+    case prefix do
+      "ac_" ->
+        {:ok, Account.get(tr, id), :account}
+
+      "mc_" ->
+        {:ok, Merchant.get(tr, id), :merchant}
+
+      "cu_" ->
+        {:ok, Merchant.get(tr, id), :currency}
+
+      <<"v_", _::binary>> ->
+        {:ok, Validator.get(tr, id), :validator}
+
+      # <<"gov_", _::binary>> ->
+      #   {:ok, GovProposal.get(tr, id), :govproposal}
 
       _ ->
         {:error, "Invalid sender"}
@@ -138,14 +204,15 @@ defmodule Hashpay.Command do
     rem(result, @threads)
   end
 
-  @spec handle(t()) :: {:ok, any()} | {:error, String.t()}
-  def handle(command) do
+  @spec handle(t(), ThunderRAM.t()) :: {:ok, any()} | {:error, String.t()}
+  def handle(command, tr) do
     case Functions.fetch(command.fun) do
       {:ok, function} ->
-        tr = ThunderRAM.get_tr(:blockchain)
+        case fetch_sender(tr, command.from, function.auth_type) do
+          {:ok, nil, _sender_type} ->
+            {:error, "Sender not found"}
 
-        case fetch_sender(tr, command.from) do
-          {:ok, sender, sender_type} ->
+          {:ok, sender = %{id: sender_id}, sender_type} ->
             cond do
               sender.channel != @channel && sender.channel != @default_channel ->
                 {:error, "Invalid channel"}
@@ -153,21 +220,24 @@ defmodule Hashpay.Command do
               function.auth_type == 1 && !verify_signature(command, sender.public_key) ->
                 {:error, "Invalid signature"}
 
-              TxIndex.valid?(tr, sender.id, command.hash) ->
+              TxIndex.valid?(tr, sender_id, command.hash) ->
                 {:error, "Transaction already executed"}
 
               true ->
-                TxIndex.put(tr, sender.id, command.hash)
                 context = Context.new(tr, command, function, sender, sender_type)
                 thread = thread(function, command)
                 SpawnPool.cast(:worker_pool, thread, context)
+                {:ok, "Transaction sent"}
             end
 
-          {:error, :not_found} ->
-            {:error, "Sender not found"}
+          {:ok, sender_type} ->
+            context = Context.new(tr, command, function, nil, sender_type)
+            thread = thread(function, command)
+            SpawnPool.cast(:worker_pool, thread, context)
+            {:ok, "Transaction sent"}
 
-          error_sender ->
-            error_sender
+          {:error, _reason} = err ->
+            err
         end
 
       _ ->
@@ -176,9 +246,26 @@ defmodule Hashpay.Command do
   end
 
   def run(context = %{command: command, fun: function}) do
-    case apply(function.mod, function.fun, [context | command.args]) do
+    case :erlang.apply(function.mod, function.fun, [context | command.args]) do
       {:error, _reason} = err -> err
       result -> result
     end
+  end
+
+  def prepare(context = %{command: command}) do
+    :ets.insert(:commands, {command.hash, context})
+  end
+
+  def push(context = %{command: command}) do
+    :ets.insert(:commands, {command.hash, context, to_list(command)})
+  end
+
+  def to_list(%__MODULE__{args: args, from: from, fun: fun, time: time, sign: sign}) do
+    [fun, args, from, time, sign]
+  end
+
+  def from_list([fun, args, from, time, sign]) do
+    %__MODULE__{args: args, from: from, fun: fun, time: time, sign: sign}
+    |> compute_hash()
   end
 end

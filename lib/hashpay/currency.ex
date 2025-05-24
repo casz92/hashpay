@@ -62,7 +62,6 @@ defmodule Hashpay.Currency do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"currencies",
       exp: false
     ]
   end

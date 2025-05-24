@@ -69,9 +69,12 @@ defmodule Hashpay.Merchant do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"merchants",
       exp: true
     ]
+  end
+
+  def get(tr, id) do
+    ThunderRAM.get(tr, @trdb, id)
   end
 
   def fetch(tr, id) do
@@ -109,7 +112,6 @@ defmodule Hashpay.MerchantName do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"merchant_names_idx",
       exp: true
     ]
   end

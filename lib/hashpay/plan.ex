@@ -78,7 +78,6 @@ defmodule Hashpay.Plan do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"plans",
       exp: true
     ]
   end

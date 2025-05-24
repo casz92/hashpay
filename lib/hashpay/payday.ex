@@ -84,7 +84,6 @@ defmodule Hashpay.Payday do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"paydays",
       exp: true
     ]
   end

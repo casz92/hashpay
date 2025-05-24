@@ -3,14 +3,13 @@ defmodule Hashpay.TxIndex do
 
   def dbopts do
     [
-      name: :tx_index,
-      handle: ~c"tx_idx",
+      name: :tx_idx,
       exp: true
     ]
   end
 
   def put(tr, sender_id, tx_hash) do
-    ThunderRAM.put(tr, :tx_index, tx_hash, sender_id)
+    ThunderRAM.put(tr, :tx_index, sender_id, tx_hash)
   end
 
   def valid?(tr, sender_id, tx_hash) do

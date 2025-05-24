@@ -148,28 +148,28 @@ defmodule Hashpay.Round do
   @doc """
   Calcula el hash de una ronda basado en sus atributos.
   """
-  def calculate_hash(round) do
+  def calculate_hash(
+        round = %{
+          blocks: blocks,
+          creator: creator,
+          prev: prev,
+          vsn: vsn,
+          timestamp: timestamp
+        }
+      ) do
     # Extraer los campos relevantes para el hash
-    fields = [
-      round.prev,
-      round.creator,
-      Integer.to_string(round.reward),
-      Integer.to_string(round.count),
-      Integer.to_string(round.txs),
-      Integer.to_string(round.vsn)
-    ]
-
-    # Si hay bloques, incluir sus hashes en el cálculo
-    block_hashes =
-      if round.blocks do
-        # Ahora blocks es una lista de binarios (hashes)
-        round.blocks
-      else
-        []
-      end
+    iodata =
+      [
+        prev,
+        creator,
+        timestamp,
+        vsn,
+        Enum.map(blocks, &Base.encode16(&1.hash))
+      ]
+      |> Enum.join("|")
 
     # Unir los campos y calcular el hash
-    <<hash::binary-24, _rest::binary>> = hash(Enum.join(fields ++ block_hashes, "|"))
+    <<hash::binary-24, _rest::binary>> = hash(iodata)
 
     [<<round.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end
@@ -268,7 +268,6 @@ defmodule Hashpay.Round do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"rounds",
       exp: true
     ]
   end

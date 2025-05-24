@@ -49,7 +49,11 @@ defmodule Hashpay.Roundchain do
 
   @doc false
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    if Keyword.get(opts, :active, false) do
+      GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    else
+      :ignore
+    end
   end
 
   defmodule State do
@@ -214,24 +218,26 @@ defmodule Hashpay.Roundchain do
 
     @max_block_size 4 * 1024 * 1024
     def get_commands(%__MODULE__{commands: commands}) do
-      do_get_commands(commands, :ets.first(commands), 0, [])
+      do_get_commands(commands, :ets.first(commands), %{})
     end
 
-    defp do_get_commands(ets, key, size, acc) do
-      case :ets.lookup(ets, key) do
-        [{^key, item}] ->
-          new_size = size + item.size
-          :ets.delete(ets, key)
+    defp do_get_commands(ets, key, acc) do
+      # case :ets.lookup(ets, key) do
+      #   [{^key, item, channel}] ->
+      #     {} = Map.get(acc, channel, {[], 0})
+      #     new_size = size + item.size
+      #     :ets.delete(ets, key)
 
-          if new_size >= @max_block_size do
-            {acc, new_size}
-          else
-            do_get_commands(ets, :ets.next(ets, key), new_size, [item | acc])
-          end
+      #     if new_size >= @max_block_size do
+      #       {acc, new_size}
+      #     else
+      #       do_get_commands(ets, :ets.next(ets, key), [item | acc])
+      #     end
 
-        _ ->
-          {acc, size}
-      end
+      #   _ ->
+      #     {acc, size}
+      # end
+      {[], 0}
     end
 
     @quorum_config Application.compile_env(:hashpay, :quorum)

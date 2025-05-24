@@ -121,19 +121,32 @@ defmodule Hashpay.Block do
   @doc """
   Calcula el hash de un bloque basado en sus atributos.
   """
-  def calculate_hash(block) do
+  def calculate_hash(
+        block = %{
+          channel: channel,
+          creator: creator,
+          height: height,
+          filehash: filehash,
+          prev: prev,
+          timestamp: timestamp,
+          vsn: vsn
+        }
+      ) do
     # Extraer los campos relevantes para el hash
-    fields = [
-      block.prev,
-      block.creator,
-      block.channel,
-      Base.decode16!(block.filehash),
-      Integer.to_string(block.count),
-      Integer.to_string(block.vsn)
-    ]
+    iodata =
+      [
+        height,
+        prev,
+        creator,
+        channel,
+        Base.decode16!(filehash),
+        timestamp,
+        vsn
+      ]
+      |> Enum.join("|")
 
     # Unir los campos y calcular el hash
-    <<hash::binary-24, _rest::binary>> = hash(Enum.join(fields, "|"))
+    <<hash::binary-24, _rest::binary>> = hash(iodata)
 
     [<<block.timestamp::64>>, hash] |> IO.iodata_to_binary()
   end
@@ -232,7 +245,6 @@ defmodule Hashpay.Block do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"blocks",
       exp: true
     ]
   end
@@ -252,8 +264,8 @@ defmodule Hashpay.Block do
     ThunderRAM.count_one(tr, @trdb)
   end
 
-  def last(tr, vid) do
-    case fetch(tr, key_merge("$last", vid)) do
+  def last(tr, channel) do
+    case fetch(tr, key_merge("$last", channel)) do
       {:ok, block} -> block
       _ -> nil
     end

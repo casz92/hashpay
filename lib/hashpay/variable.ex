@@ -94,7 +94,6 @@ defmodule Hashpay.Variable do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"variables",
       exp: false
     ]
   end

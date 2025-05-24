@@ -100,7 +100,6 @@ defmodule Hashpay.Lottery do
   def dbopts do
     [
       name: @trdb,
-      handle: ~c"lotteries",
       exp: true
     ]
   end
