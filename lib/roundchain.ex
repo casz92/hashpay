@@ -218,10 +218,22 @@ defmodule Hashpay.Roundchain do
 
     @max_block_size 4 * 1024 * 1024
     def get_commands(%__MODULE__{commands: commands}) do
-      do_get_commands(commands, :ets.first(commands), %{})
+      tid = :ets.new(:temp, [:ordered_set])
+      do_get_commands(commands, :ets.first(commands), %{}, tid)
     end
 
-    defp do_get_commands(ets, key, acc) do
+    defp do_get_commands(ets, key, acc, tid) do
+
+      :ets.foldl(
+        fn {hash, context, size}, acc ->
+          :ets
+
+          acc + size
+        end,
+        0,
+        ets
+      )
+
       # case :ets.lookup(ets, key) do
       #   [{^key, item, channel}] ->
       #     {} = Map.get(acc, channel, {[], 0})

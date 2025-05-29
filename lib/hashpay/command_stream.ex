@@ -2,36 +2,29 @@ defmodule CommandStream do
   defstruct [:tid, :type, :counter]
 
   def new do
-    %CommandStream{
-      tid: :ets.new(:CommandStream, [:set, :public]),
-      type: :set
-    }
-  end
-
-  def new(:ordened_set = type) do
-    counter = :counters.new(1, [:write_concurrency])
+    counter = :counters.new(1, write_concurrency: true)
 
     %CommandStream{
-      tid: :ets.new(:CommandStream, [type, :public]),
-      type: type,
+      tid: :ets.new(:CommandStream, [:ordered_set, :public]),
+      type: :ordered_set,
       counter: counter
     }
   end
 
-  def add(stream = %CommandStream{counter: counter, tid: tid, type: :ordened_set}, ctx) do
-    id = :counters.add(counter, 0, 1)
-    :ets.insert(tid, {id, ctx})
+  def add(stream = %CommandStream{counter: counter, tid: tid}, ctx, _thread) do
+    ix = :counters.add(counter, 0, 1)
+    :ets.insert(tid, {ix, ctx, ctx.size})
     stream
   end
 
-  def add(stream = %CommandStream{tid: tid}, ctx) do
-    :ets.insert(tid, {ctx.command.hash, ctx})
-    stream
-  end
+  # def add(stream = %CommandStream{tid: tid}, ctx) do
+  #   :ets.insert(tid, {ctx.command.hash, ctx})
+  #   stream
+  # end
 
   def run(%CommandStream{tid: tid}) do
     :ets.foldl(
-      fn {_id, context}, _acc ->
+      fn {_id, context, _size}, _acc ->
         Hashpay.Command.run(context)
       end,
       0,

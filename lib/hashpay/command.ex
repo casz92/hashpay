@@ -42,25 +42,13 @@ defmodule Hashpay.Command do
   alias Hashpay.TxIndex
   import Hashpay, only: [hash: 1]
 
-  def new(attrs, size, :text) do
+  def new(attrs, size) do
     %__MODULE__{
       fun: attrs["fun"],
       args: attrs["args"],
       from: attrs["from"],
       size: size,
       sign: Base.decode64!(attrs["sign"]),
-      time: attrs["time"]
-    }
-    |> compute_hash()
-  end
-
-  def new(attrs, size, :binary) do
-    %__MODULE__{
-      fun: attrs["fun"],
-      args: attrs["args"],
-      from: attrs["from"],
-      size: size,
-      sign: attrs["sign"],
       time: attrs["time"]
     }
     |> compute_hash()
@@ -77,7 +65,7 @@ defmodule Hashpay.Command do
   end
 
   defmodule Encoder do
-    @join ""
+    @join "|"
 
     def to_binary(value) when is_map(value) do
       value
@@ -94,7 +82,7 @@ defmodule Hashpay.Command do
     def to_binary(value), do: to_string(value)
   end
 
-  defp compute_hash(command = %{time: time, fun: fun, args: args, from: from, sign: signature}) do
+  defp compute_hash(command = %{time: time, fun: fun, args: args, from: from}) do
     targs = Encoder.to_binary(args)
 
     iodata =
@@ -108,7 +96,7 @@ defmodule Hashpay.Command do
 
     <<fhash::binary-24, _rest::binary>> = hash(iodata)
     hash = [<<time::64>>, fhash] |> IO.iodata_to_binary()
-    %{command | hash: hash, size: byte_size(iodata) + byte_size(signature)}
+    %{command | hash: hash}
   end
 
   def sign(command, private_key) do
